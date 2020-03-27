@@ -1,6 +1,3 @@
 [submodule "lib/mrs-cdp-manager"]
 	path = lib/mrs-cdp-manager
 	url = https://github.com/sweatdao/mrs-cdp-manager
-[submodule "lib/proxy-registry"]
-	path = lib/proxy-registry
-	url = https://github.com/sweatdao/proxy-registry
