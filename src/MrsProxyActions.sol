@@ -1,4 +1,4 @@
-pragma solidity ^0.5.12;
+pragma solidity ^0.5.15;
 
 contract GemLike {
     function approve(address, uint) public;
@@ -30,7 +30,7 @@ contract ManagerLike {
 contract VatLike {
     function can(address, address) public view returns (uint);
     function ilks(bytes32) public view returns (uint, uint, uint, uint, uint);
-    function dai(address) public view returns (uint);
+    function mai(address) public view returns (uint);
     function urns(bytes32, address) public view returns (uint, uint);
     function frob(bytes32, address, address, address, int, int) public;
     function hope(address) public;
@@ -49,9 +49,9 @@ contract GNTJoinLike {
     function make(address) public returns (address);
 }
 
-contract DaiJoinLike {
+contract MaiJoinLike {
     function vat() public returns (VatLike);
-    function dai() public returns (GemLike);
+    function mai() public returns (GemLike);
     function join(address, uint) public payable;
     function exit(address, uint) public;
 }
@@ -104,17 +104,17 @@ contract Common {
 
     // Public functions
 
-    function daiJoin_join(address apt, address urn, uint wad) public {
-        // Gets DAI from the user's wallet
-        DaiJoinLike(apt).dai().transferFrom(msg.sender, address(this), wad);
-        // Approves adapter to take the DAI amount
-        DaiJoinLike(apt).dai().approve(apt, wad);
-        // Joins DAI into the vat
-        DaiJoinLike(apt).join(urn, wad);
+    function maiJoin_join(address apt, address urn, uint wad) public {
+        // Gets MAI from the user's wallet
+        MaiJoinLike(apt).mai().transferFrom(msg.sender, address(this), wad);
+        // Approves adapter to take the MAI amount
+        MaiJoinLike(apt).mai().approve(apt, wad);
+        // Joins MAI into the vat
+        MaiJoinLike(apt).join(urn, wad);
     }
 }
 
-contract DssProxyActions is Common {
+contract MrsProxyActions is Common {
     // Internal functions
 
     function sub(uint x, uint y) internal pure returns (uint z) {
@@ -149,21 +149,21 @@ contract DssProxyActions is Common {
         // Updates stability fee rate
         uint rate = JugLike(jug).drip(ilk);
 
-        // Gets DAI balance of the urn in the vat
-        uint dai = VatLike(vat).dai(urn);
+        // Gets MAI balance of the urn in the vat
+        uint mai = VatLike(vat).mai(urn);
 
-        // If there was already enough DAI in the vat balance, just exits it without adding more debt
-        if (dai < mul(wad, RAY)) {
-            // Calculates the needed dart so together with the existing dai in the vat is enough to exit wad amount of DAI tokens
-            dart = toInt(sub(mul(wad, RAY), dai) / rate);
-            // This is neeeded due lack of precision. It might need to sum an extra dart wei (for the given DAI wad amount)
+        // If there was already enough MAI in the vat balance, just exits it without adding more debt
+        if (mai < mul(wad, RAY)) {
+            // Calculates the needed dart so together with the existing mai in the vat is enough to exit wad amount of MAI tokens
+            dart = toInt(sub(mul(wad, RAY), mai) / rate);
+            // This is neeeded due lack of precision. It might need to sum an extra dart wei (for the given MAI wad amount)
             dart = mul(uint(dart), rate) < mul(wad, RAY) ? dart + 1 : dart;
         }
     }
 
     function _getWipeDart(
         address vat,
-        uint dai,
+        uint mai,
         address urn,
         bytes32 ilk
     ) internal view returns (int dart) {
@@ -172,8 +172,8 @@ contract DssProxyActions is Common {
         // Gets actual art value of the urn
         (, uint art) = VatLike(vat).urns(ilk, urn);
 
-        // Uses the whole dai balance in the vat to reduce the debt
-        dart = toInt(dai / rate);
+        // Uses the whole mai balance in the vat to reduce the debt
+        dart = toInt(mai / rate);
         // Checks the calculated dart is not higher than urn.art (total debt), otherwise uses its value
         dart = uint(dart) <= art ? - dart : - toInt(art);
     }
@@ -188,10 +188,10 @@ contract DssProxyActions is Common {
         (, uint rate,,,) = VatLike(vat).ilks(ilk);
         // Gets actual art value of the urn
         (, uint art) = VatLike(vat).urns(ilk, urn);
-        // Gets actual dai amount in the urn
-        uint dai = VatLike(vat).dai(usr);
+        // Gets actual mai amount in the urn
+        uint mai = VatLike(vat).mai(usr);
 
-        uint rad = sub(mul(art, rate), dai);
+        uint rad = sub(mul(art, rate), mai);
         wad = rad / RAY;
 
         // If the rad precision has some dust, it will need to request for 1 extra wad wei
@@ -478,7 +478,7 @@ contract DssProxyActions is Common {
     function draw(
         address manager,
         address jug,
-        address daiJoin,
+        address maiJoin,
         uint cdp,
         uint wad
     ) public {
@@ -487,19 +487,19 @@ contract DssProxyActions is Common {
         bytes32 ilk = ManagerLike(manager).ilks(cdp);
         // Generates debt in the CDP
         frob(manager, cdp, 0, _getDrawDart(vat, jug, urn, ilk, wad));
-        // Moves the DAI amount (balance in the vat in rad) to proxy's address
+        // Moves the MAI amount (balance in the vat in rad) to proxy's address
         move(manager, cdp, address(this), toRad(wad));
-        // Allows adapter to access to proxy's DAI balance in the vat
-        if (VatLike(vat).can(address(this), address(daiJoin)) == 0) {
-            VatLike(vat).hope(daiJoin);
+        // Allows adapter to access to proxy's MAI balance in the vat
+        if (VatLike(vat).can(address(this), address(maiJoin)) == 0) {
+            VatLike(vat).hope(maiJoin);
         }
-        // Exits DAI to the user's wallet as a token
-        DaiJoinLike(daiJoin).exit(msg.sender, wad);
+        // Exits MAI to the user's wallet as a token
+        MaiJoinLike(maiJoin).exit(msg.sender, wad);
     }
 
     function wipe(
         address manager,
-        address daiJoin,
+        address maiJoin,
         uint cdp,
         uint wad
     ) public {
@@ -509,13 +509,13 @@ contract DssProxyActions is Common {
 
         address own = ManagerLike(manager).owns(cdp);
         if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
-            // Joins DAI amount into the vat
-            daiJoin_join(daiJoin, urn, wad);
+            // Joins MAI amount into the vat
+            maiJoin_join(maiJoin, urn, wad);
             // Paybacks debt to the CDP
-            frob(manager, cdp, 0, _getWipeDart(vat, VatLike(vat).dai(urn), urn, ilk));
+            frob(manager, cdp, 0, _getWipeDart(vat, VatLike(vat).mai(urn), urn, ilk));
         } else {
-             // Joins DAI amount into the vat
-            daiJoin_join(daiJoin, address(this), wad);
+             // Joins MAI amount into the vat
+            maiJoin_join(maiJoin, address(this), wad);
             // Paybacks debt to the CDP
             VatLike(vat).frob(
                 ilk,
@@ -530,18 +530,18 @@ contract DssProxyActions is Common {
 
     function safeWipe(
         address manager,
-        address daiJoin,
+        address maiJoin,
         uint cdp,
         uint wad,
         address owner
     ) public {
         require(ManagerLike(manager).owns(cdp) == owner, "owner-missmatch");
-        wipe(manager, daiJoin, cdp, wad);
+        wipe(manager, maiJoin, cdp, wad);
     }
 
     function wipeAll(
         address manager,
-        address daiJoin,
+        address maiJoin,
         uint cdp
     ) public {
         address vat = ManagerLike(manager).vat();
@@ -551,13 +551,13 @@ contract DssProxyActions is Common {
 
         address own = ManagerLike(manager).owns(cdp);
         if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
-            // Joins DAI amount into the vat
-            daiJoin_join(daiJoin, urn, _getWipeAllWad(vat, urn, urn, ilk));
+            // Joins MAI amount into the vat
+            maiJoin_join(maiJoin, urn, _getWipeAllWad(vat, urn, urn, ilk));
             // Paybacks debt to the CDP
             frob(manager, cdp, 0, -int(art));
         } else {
-            // Joins DAI amount into the vat
-            daiJoin_join(daiJoin, address(this), _getWipeAllWad(vat, address(this), urn, ilk));
+            // Joins MAI amount into the vat
+            maiJoin_join(maiJoin, address(this), _getWipeAllWad(vat, address(this), urn, ilk));
             // Paybacks debt to the CDP
             VatLike(vat).frob(
                 ilk,
@@ -572,19 +572,19 @@ contract DssProxyActions is Common {
 
     function safeWipeAll(
         address manager,
-        address daiJoin,
+        address maiJoin,
         uint cdp,
         address owner
     ) public {
         require(ManagerLike(manager).owns(cdp) == owner, "owner-missmatch");
-        wipeAll(manager, daiJoin, cdp);
+        wipeAll(manager, maiJoin, cdp);
     }
 
     function lockETHAndDraw(
         address manager,
         address jug,
         address ethJoin,
-        address daiJoin,
+        address maiJoin,
         uint cdp,
         uint wadD
     ) public payable {
@@ -595,33 +595,33 @@ contract DssProxyActions is Common {
         ethJoin_join(ethJoin, urn);
         // Locks WETH amount into the CDP and generates debt
         frob(manager, cdp, toInt(msg.value), _getDrawDart(vat, jug, urn, ilk, wadD));
-        // Moves the DAI amount (balance in the vat in rad) to proxy's address
+        // Moves the MAI amount (balance in the vat in rad) to proxy's address
         move(manager, cdp, address(this), toRad(wadD));
-        // Allows adapter to access to proxy's DAI balance in the vat
-        if (VatLike(vat).can(address(this), address(daiJoin)) == 0) {
-            VatLike(vat).hope(daiJoin);
+        // Allows adapter to access to proxy's MAI balance in the vat
+        if (VatLike(vat).can(address(this), address(maiJoin)) == 0) {
+            VatLike(vat).hope(maiJoin);
         }
-        // Exits DAI to the user's wallet as a token
-        DaiJoinLike(daiJoin).exit(msg.sender, wadD);
+        // Exits MAI to the user's wallet as a token
+        MaiJoinLike(maiJoin).exit(msg.sender, wadD);
     }
 
     function openLockETHAndDraw(
         address manager,
         address jug,
         address ethJoin,
-        address daiJoin,
+        address maiJoin,
         bytes32 ilk,
         uint wadD
     ) public payable returns (uint cdp) {
         cdp = open(manager, ilk, address(this));
-        lockETHAndDraw(manager, jug, ethJoin, daiJoin, cdp, wadD);
+        lockETHAndDraw(manager, jug, ethJoin, maiJoin, cdp, wadD);
     }
 
     function lockGemAndDraw(
         address manager,
         address jug,
         address gemJoin,
-        address daiJoin,
+        address maiJoin,
         uint cdp,
         uint wadC,
         uint wadD,
@@ -634,35 +634,35 @@ contract DssProxyActions is Common {
         gemJoin_join(gemJoin, urn, wadC, transferFrom);
         // Locks token amount into the CDP and generates debt
         frob(manager, cdp, toInt(convertTo18(gemJoin, wadC)), _getDrawDart(vat, jug, urn, ilk, wadD));
-        // Moves the DAI amount (balance in the vat in rad) to proxy's address
+        // Moves the MAI amount (balance in the vat in rad) to proxy's address
         move(manager, cdp, address(this), toRad(wadD));
-        // Allows adapter to access to proxy's DAI balance in the vat
-        if (VatLike(vat).can(address(this), address(daiJoin)) == 0) {
-            VatLike(vat).hope(daiJoin);
+        // Allows adapter to access to proxy's MAI balance in the vat
+        if (VatLike(vat).can(address(this), address(maiJoin)) == 0) {
+            VatLike(vat).hope(maiJoin);
         }
-        // Exits DAI to the user's wallet as a token
-        DaiJoinLike(daiJoin).exit(msg.sender, wadD);
+        // Exits MAI to the user's wallet as a token
+        MaiJoinLike(maiJoin).exit(msg.sender, wadD);
     }
 
     function openLockGemAndDraw(
         address manager,
         address jug,
         address gemJoin,
-        address daiJoin,
+        address maiJoin,
         bytes32 ilk,
         uint wadC,
         uint wadD,
         bool transferFrom
     ) public returns (uint cdp) {
         cdp = open(manager, ilk, address(this));
-        lockGemAndDraw(manager, jug, gemJoin, daiJoin, cdp, wadC, wadD, transferFrom);
+        lockGemAndDraw(manager, jug, gemJoin, maiJoin, cdp, wadC, wadD, transferFrom);
     }
 
     function openLockGNTAndDraw(
         address manager,
         address jug,
         address gntJoin,
-        address daiJoin,
+        address maiJoin,
         bytes32 ilk,
         uint wadC,
         uint wadD
@@ -674,26 +674,26 @@ contract DssProxyActions is Common {
         }
         // Transfer funds to the funds which previously were sent to the proxy
         GemLike(GemJoinLike(gntJoin).gem()).transfer(bag, wadC);
-        cdp = openLockGemAndDraw(manager, jug, gntJoin, daiJoin, ilk, wadC, wadD, false);
+        cdp = openLockGemAndDraw(manager, jug, gntJoin, maiJoin, ilk, wadC, wadD, false);
     }
 
     function wipeAndFreeETH(
         address manager,
         address ethJoin,
-        address daiJoin,
+        address maiJoin,
         uint cdp,
         uint wadC,
         uint wadD
     ) public {
         address urn = ManagerLike(manager).urns(cdp);
-        // Joins DAI amount into the vat
-        daiJoin_join(daiJoin, urn, wadD);
+        // Joins MAI amount into the vat
+        maiJoin_join(maiJoin, urn, wadD);
         // Paybacks debt to the CDP and unlocks WETH amount from it
         frob(
             manager,
             cdp,
             -toInt(wadC),
-            _getWipeDart(ManagerLike(manager).vat(), VatLike(ManagerLike(manager).vat()).dai(urn), urn, ManagerLike(manager).ilks(cdp))
+            _getWipeDart(ManagerLike(manager).vat(), VatLike(ManagerLike(manager).vat()).mai(urn), urn, ManagerLike(manager).ilks(cdp))
         );
         // Moves the amount from the CDP urn to proxy's address
         flux(manager, cdp, address(this), wadC);
@@ -708,7 +708,7 @@ contract DssProxyActions is Common {
     function wipeAllAndFreeETH(
         address manager,
         address ethJoin,
-        address daiJoin,
+        address maiJoin,
         uint cdp,
         uint wadC
     ) public {
@@ -717,8 +717,8 @@ contract DssProxyActions is Common {
         bytes32 ilk = ManagerLike(manager).ilks(cdp);
         (, uint art) = VatLike(vat).urns(ilk, urn);
 
-        // Joins DAI amount into the vat
-        daiJoin_join(daiJoin, urn, _getWipeAllWad(vat, urn, urn, ilk));
+        // Joins MAI amount into the vat
+        maiJoin_join(maiJoin, urn, _getWipeAllWad(vat, urn, urn, ilk));
         // Paybacks debt to the CDP and unlocks WETH amount from it
         frob(
             manager,
@@ -739,21 +739,21 @@ contract DssProxyActions is Common {
     function wipeAndFreeGem(
         address manager,
         address gemJoin,
-        address daiJoin,
+        address maiJoin,
         uint cdp,
         uint wadC,
         uint wadD
     ) public {
         address urn = ManagerLike(manager).urns(cdp);
-        // Joins DAI amount into the vat
-        daiJoin_join(daiJoin, urn, wadD);
+        // Joins MAI amount into the vat
+        maiJoin_join(maiJoin, urn, wadD);
         uint wad18 = convertTo18(gemJoin, wadC);
         // Paybacks debt to the CDP and unlocks token amount from it
         frob(
             manager,
             cdp,
             -toInt(wad18),
-            _getWipeDart(ManagerLike(manager).vat(), VatLike(ManagerLike(manager).vat()).dai(urn), urn, ManagerLike(manager).ilks(cdp))
+            _getWipeDart(ManagerLike(manager).vat(), VatLike(ManagerLike(manager).vat()).mai(urn), urn, ManagerLike(manager).ilks(cdp))
         );
         // Moves the amount from the CDP urn to proxy's address
         flux(manager, cdp, address(this), wad18);
@@ -764,7 +764,7 @@ contract DssProxyActions is Common {
     function wipeAllAndFreeGem(
         address manager,
         address gemJoin,
-        address daiJoin,
+        address maiJoin,
         uint cdp,
         uint wadC
     ) public {
@@ -773,8 +773,8 @@ contract DssProxyActions is Common {
         bytes32 ilk = ManagerLike(manager).ilks(cdp);
         (, uint art) = VatLike(vat).urns(ilk, urn);
 
-        // Joins DAI amount into the vat
-        daiJoin_join(daiJoin, urn, _getWipeAllWad(vat, urn, urn, ilk));
+        // Joins MAI amount into the vat
+        maiJoin_join(maiJoin, urn, _getWipeAllWad(vat, urn, urn, ilk));
         uint wad18 = convertTo18(gemJoin, wadC);
         // Paybacks debt to the CDP and unlocks token amount from it
         frob(
@@ -790,7 +790,7 @@ contract DssProxyActions is Common {
     }
 }
 
-contract DssProxyActionsEnd is Common {
+contract MrsProxyActionsEnd is Common {
     // Internal functions
 
     function _free(
@@ -847,13 +847,13 @@ contract DssProxyActionsEnd is Common {
     }
 
     function pack(
-        address daiJoin,
+        address maiJoin,
         address end,
         uint wad
     ) public {
-        daiJoin_join(daiJoin, address(this), wad);
-        VatLike vat = DaiJoinLike(daiJoin).vat();
-        // Approves the end to take out DAI from the proxy's balance in the vat
+        maiJoin_join(maiJoin, address(this), wad);
+        VatLike vat = MaiJoinLike(maiJoin).vat();
+        // Approves the end to take out MAI from the proxy's balance in the vat
         if (vat.can(address(this), address(end)) == 0) {
             vat.hope(end);
         }
@@ -888,67 +888,67 @@ contract DssProxyActionsEnd is Common {
     }
 }
 
-contract DssProxyActionsDsr is Common {
+contract MrsProxyActionsMsr is Common {
     function join(
-        address daiJoin,
+        address maiJoin,
         address pot,
         uint wad
     ) public {
-        VatLike vat = DaiJoinLike(daiJoin).vat();
+        VatLike vat = MaiJoinLike(maiJoin).vat();
         // Executes drip to get the chi rate updated to rho == now, otherwise join will fail
         uint chi = PotLike(pot).drip();
         // Joins wad amount to the vat balance
-        daiJoin_join(daiJoin, address(this), wad);
-        // Approves the pot to take out DAI from the proxy's balance in the vat
+        maiJoin_join(maiJoin, address(this), wad);
+        // Approves the pot to take out MAI from the proxy's balance in the vat
         if (vat.can(address(this), address(pot)) == 0) {
             vat.hope(pot);
         }
-        // Joins the pie value (equivalent to the DAI wad amount) in the pot
+        // Joins the pie value (equivalent to the MAI wad amount) in the pot
         PotLike(pot).join(mul(wad, RAY) / chi);
     }
 
     function exit(
-        address daiJoin,
+        address maiJoin,
         address pot,
         uint wad
     ) public {
-        VatLike vat = DaiJoinLike(daiJoin).vat();
+        VatLike vat = MaiJoinLike(maiJoin).vat();
         // Executes drip to count the savings accumulated until this moment
         uint chi = PotLike(pot).drip();
-        // Calculates the pie value in the pot equivalent to the DAI wad amount
+        // Calculates the pie value in the pot equivalent to the MAI wad amount
         uint pie = mul(wad, RAY) / chi;
-        // Exits DAI from the pot
+        // Exits MAI from the pot
         PotLike(pot).exit(pie);
-        // Checks the actual balance of DAI in the vat after the pot exit
-        uint bal = DaiJoinLike(daiJoin).vat().dai(address(this));
-        // Allows adapter to access to proxy's DAI balance in the vat
-        if (vat.can(address(this), address(daiJoin)) == 0) {
-            vat.hope(daiJoin);
+        // Checks the actual balance of MAI in the vat after the pot exit
+        uint bal = MaiJoinLike(maiJoin).vat().mai(address(this));
+        // Allows adapter to access to proxy's MAI balance in the vat
+        if (vat.can(address(this), address(maiJoin)) == 0) {
+            vat.hope(maiJoin);
         }
         // It is necessary to check if due rounding the exact wad amount can be exited by the adapter.
-        // Otherwise it will do the maximum DAI balance in the vat
-        DaiJoinLike(daiJoin).exit(
+        // Otherwise it will do the maximum MAI balance in the vat
+        MaiJoinLike(maiJoin).exit(
             msg.sender,
             bal >= mul(wad, RAY) ? wad : bal / RAY
         );
     }
 
     function exitAll(
-        address daiJoin,
+        address maiJoin,
         address pot
     ) public {
-        VatLike vat = DaiJoinLike(daiJoin).vat();
+        VatLike vat = MaiJoinLike(maiJoin).vat();
         // Executes drip to count the savings accumulated until this moment
         uint chi = PotLike(pot).drip();
         // Gets the total pie belonging to the proxy address
         uint pie = PotLike(pot).pie(address(this));
-        // Exits DAI from the pot
+        // Exits MAI from the pot
         PotLike(pot).exit(pie);
-        // Allows adapter to access to proxy's DAI balance in the vat
-        if (vat.can(address(this), address(daiJoin)) == 0) {
-            vat.hope(daiJoin);
+        // Allows adapter to access to proxy's MAI balance in the vat
+        if (vat.can(address(this), address(maiJoin)) == 0) {
+            vat.hope(maiJoin);
         }
-        // Exits the DAI amount corresponding to the value of pie
-        DaiJoinLike(daiJoin).exit(msg.sender, mul(chi, pie) / RAY);
+        // Exits the MAI amount corresponding to the value of pie
+        MaiJoinLike(maiJoin).exit(msg.sender, mul(chi, pie) / RAY);
     }
 }

@@ -1,107 +1,106 @@
-pragma solidity ^0.5.12;
+pragma solidity ^0.5.15;
 
-import "ds-test/test.sol";
+import "mrs-cdp-manager/test.sol";
+import "./MrsProxyActions.sol";
 
-import "./DssProxyActions.sol";
-
-import {DssDeployTestBase, Flipper} from "dss-deploy/DssDeploy.t.base.sol";
-import {DGD, GNT} from "dss-deploy/tokens.sol";
-import {GemJoin3, GemJoin4} from "dss-deploy/join.sol";
+import {MrsDeployTestBase, Flipper} from "mrs-deploy/MrsDeploy.t.base.sol";
+import {DGD, GNT} from "./tokens.sol";
+import {GemJoin3, GemJoin4} from "mrs-deploy/join.sol";
 import {DSValue} from "ds-value/value.sol";
-import {DssCdpManager} from "dss-cdp-manager/DssCdpManager.sol";
-import {GetCdps} from "dss-cdp-manager/GetCdps.sol";
-import {ProxyRegistry, DSProxyFactory, DSProxy} from "proxy-registry/ProxyRegistry.sol";
+import {MrsCdpManager} from "mrs-cdp-manager/MrsCdpManager.sol";
+import {GetCdps} from "mrs-cdp-manager/GetCdps.sol";
+import {ProxyRegistry, DSProxyFactory, DSProxy} from "./ProxyRegistry.sol";
 
 contract ProxyCalls {
     DSProxy proxy;
-    address dssProxyActions;
-    address dssProxyActionsEnd;
-    address dssProxyActionsDsr;
+    address mrsProxyActions;
+    address mrsProxyActionsEnd;
+    address mrsProxyActionsMsr;
 
     function transfer(address, address, uint256) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function open(address, bytes32, address) public returns (uint cdp) {
-        bytes memory response = proxy.execute(dssProxyActions, msg.data);
+        bytes memory response = proxy.execute(mrsProxyActions, msg.data);
         assembly {
             cdp := mload(add(response, 0x20))
         }
     }
 
     function give(address, uint, address) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function giveToProxy(address, address, uint, address) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function cdpAllow(address, uint, address, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function urnAllow(address, address, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function hope(address, address) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function nope(address, address) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function flux(address, uint, address, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function move(address, uint, address, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function frob(address, uint, int, int) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function frob(address, uint, address, int, int) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function quit(address, uint, address) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function enter(address, address, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function shift(address, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function lockETH(address, address, uint) public payable {
-        (bool success,) = address(proxy).call.value(msg.value)(abi.encodeWithSignature("execute(address,bytes)", dssProxyActions, msg.data));
+        (bool success,) = address(proxy).call.value(msg.value)(abi.encodeWithSignature("execute(address,bytes)", mrsProxyActions, msg.data));
         require(success, "");
     }
 
     function safeLockETH(address, address, uint, address) public payable {
-        (bool success,) = address(proxy).call.value(msg.value)(abi.encodeWithSignature("execute(address,bytes)", dssProxyActions, msg.data));
+        (bool success,) = address(proxy).call.value(msg.value)(abi.encodeWithSignature("execute(address,bytes)", mrsProxyActions, msg.data));
         require(success, "");
     }
 
     function lockGem(address, address, uint, uint, bool) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function safeLockGem(address, address, uint, uint, bool, address) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function makeGemBag(address) public returns (address bag) {
         address payable target = address(proxy);
-        bytes memory data = abi.encodeWithSignature("execute(address,bytes)", dssProxyActions, msg.data);
+        bytes memory data = abi.encodeWithSignature("execute(address,bytes)", mrsProxyActions, msg.data);
         assembly {
             let succeeded := call(sub(gas, 5000), target, callvalue, add(data, 0x20), mload(data), 0, 0)
             let size := returndatasize
@@ -121,49 +120,49 @@ contract ProxyCalls {
     }
 
     function freeETH(address, address, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function freeGem(address, address, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function exitETH(address, address, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function exitGem(address, address, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function draw(address, address, address, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function wipe(address, address, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function wipeAll(address, address, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function safeWipe(address, address, uint, uint, address) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function safeWipeAll(address, address, uint, address) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function lockETHAndDraw(address, address, address, address, uint, uint) public payable {
-        (bool success,) = address(proxy).call.value(msg.value)(abi.encodeWithSignature("execute(address,bytes)", dssProxyActions, msg.data));
+        (bool success,) = address(proxy).call.value(msg.value)(abi.encodeWithSignature("execute(address,bytes)", mrsProxyActions, msg.data));
         require(success, "");
     }
 
     function openLockETHAndDraw(address, address, address, address, bytes32, uint) public payable returns (uint cdp) {
         address payable target = address(proxy);
-        bytes memory data = abi.encodeWithSignature("execute(address,bytes)", dssProxyActions, msg.data);
+        bytes memory data = abi.encodeWithSignature("execute(address,bytes)", mrsProxyActions, msg.data);
         assembly {
             let succeeded := call(sub(gas, 5000), target, callvalue, add(data, 0x20), mload(data), 0, 0)
             let size := returndatasize
@@ -183,18 +182,18 @@ contract ProxyCalls {
     }
 
     function lockGemAndDraw(address, address, address, address, uint, uint, uint, bool) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function openLockGemAndDraw(address, address, address, address, bytes32, uint, uint, bool) public returns (uint cdp) {
-        bytes memory response = proxy.execute(dssProxyActions, msg.data);
+        bytes memory response = proxy.execute(mrsProxyActions, msg.data);
         assembly {
             cdp := mload(add(response, 0x20))
         }
     }
 
     function openLockGNTAndDraw(address, address, address, address, bytes32, uint, uint) public returns (address bag, uint cdp) {
-        bytes memory response = proxy.execute(dssProxyActions, msg.data);
+        bytes memory response = proxy.execute(mrsProxyActions, msg.data);
         assembly {
             bag := mload(add(response, 0x20))
             cdp := mload(add(response, 0x40))
@@ -202,57 +201,57 @@ contract ProxyCalls {
     }
 
     function wipeAndFreeETH(address, address, address, uint, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function wipeAllAndFreeETH(address, address, address, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function wipeAndFreeGem(address, address, address, uint, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function wipeAllAndFreeGem(address, address, address, uint, uint) public {
-        proxy.execute(dssProxyActions, msg.data);
+        proxy.execute(mrsProxyActions, msg.data);
     }
 
     function end_freeETH(address a, address b, address c, uint d) public {
-        proxy.execute(dssProxyActionsEnd, abi.encodeWithSignature("freeETH(address,address,address,uint256)", a, b, c, d));
+        proxy.execute(mrsProxyActionsEnd, abi.encodeWithSignature("freeETH(address,address,address,uint256)", a, b, c, d));
     }
 
     function end_freeGem(address a, address b, address c, uint d) public {
-        proxy.execute(dssProxyActionsEnd, abi.encodeWithSignature("freeGem(address,address,address,uint256)", a, b, c, d));
+        proxy.execute(mrsProxyActionsEnd, abi.encodeWithSignature("freeGem(address,address,address,uint256)", a, b, c, d));
     }
 
     function end_pack(address a, address b, uint c) public {
-        proxy.execute(dssProxyActionsEnd, abi.encodeWithSignature("pack(address,address,uint256)", a, b, c));
+        proxy.execute(mrsProxyActionsEnd, abi.encodeWithSignature("pack(address,address,uint256)", a, b, c));
     }
 
     function end_cashETH(address a, address b, bytes32 c, uint d) public {
-        proxy.execute(dssProxyActionsEnd, abi.encodeWithSignature("cashETH(address,address,bytes32,uint256)", a, b, c, d));
+        proxy.execute(mrsProxyActionsEnd, abi.encodeWithSignature("cashETH(address,address,bytes32,uint256)", a, b, c, d));
     }
 
     function end_cashGem(address a, address b, bytes32 c, uint d) public {
-        proxy.execute(dssProxyActionsEnd, abi.encodeWithSignature("cashGem(address,address,bytes32,uint256)", a, b, c, d));
+        proxy.execute(mrsProxyActionsEnd, abi.encodeWithSignature("cashGem(address,address,bytes32,uint256)", a, b, c, d));
     }
 
     function dsr_join(address a, address b, uint c) public {
-        proxy.execute(dssProxyActionsDsr, abi.encodeWithSignature("join(address,address,uint256)", a, b, c));
+        proxy.execute(mrsProxyActionsMsr, abi.encodeWithSignature("join(address,address,uint256)", a, b, c));
     }
 
     function dsr_exit(address a, address b, uint c) public {
-        proxy.execute(dssProxyActionsDsr, abi.encodeWithSignature("exit(address,address,uint256)", a, b, c));
+        proxy.execute(mrsProxyActionsMsr, abi.encodeWithSignature("exit(address,address,uint256)", a, b, c));
     }
 
     function dsr_exitAll(address a, address b) public {
-        proxy.execute(dssProxyActionsDsr, abi.encodeWithSignature("exitAll(address,address)", a, b));
+        proxy.execute(mrsProxyActionsMsr, abi.encodeWithSignature("exitAll(address,address)", a, b));
     }
 }
 
 contract FakeUser {
     function doGive(
-        DssCdpManager manager,
+        MrsCdpManager manager,
         uint cdp,
         address dst
     ) public {
@@ -260,8 +259,8 @@ contract FakeUser {
     }
 }
 
-contract DssProxyActionsTest is DssDeployTestBase, ProxyCalls {
-    DssCdpManager manager;
+contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
+    MrsCdpManager manager;
 
     GemJoin3 dgdJoin;
     DGD dgd;
@@ -280,8 +279,8 @@ contract DssProxyActionsTest is DssDeployTestBase, ProxyCalls {
         dgd = new DGD(1000 * 10 ** 9);
         dgdJoin = new GemJoin3(address(vat), "DGD", address(dgd), 9);
         pipDGD = new DSValue();
-        dssDeploy.deployCollateral("DGD", address(dgdJoin), address(pipDGD));
-        (dgdFlip, ) = dssDeploy.ilks("DGD");
+        mrsDeploy.deployCollateral("DGD", address(dgdJoin), address(pipDGD));
+        (dgdFlip, ) = mrsDeploy.ilks("DGD");
         pipDGD.poke(bytes32(uint(50 ether))); // Price 50 DAI = 1 DGD (in precision 18)
         this.file(address(spotter), "DGD", "mat", uint(1500000000 ether)); // Liquidation ratio 150%
         this.file(address(vat), bytes32("DGD"), bytes32("line"), uint(10000 * 10 ** 45));
@@ -292,7 +291,7 @@ contract DssProxyActionsTest is DssDeployTestBase, ProxyCalls {
         gnt = new GNT(1000000 ether);
         gntJoin = new GemJoin4(address(vat), "GNT", address(gnt));
         pipGNT = new DSValue();
-        dssDeploy.deployCollateral("GNT", address(gntJoin), address(pipGNT));
+        mrsDeploy.deployCollateral("GNT", address(gntJoin), address(pipGNT));
         pipGNT.poke(bytes32(uint(100 ether))); // Price 100 DAI = 1 GNT
         this.file(address(spotter), "GNT", "mat", uint(1500000000 ether)); // Liquidation ratio 150%
         this.file(address(vat), bytes32("GNT"), bytes32("line"), uint(10000 * 10 ** 45));
@@ -300,12 +299,12 @@ contract DssProxyActionsTest is DssDeployTestBase, ProxyCalls {
         (,, spot,,) = vat.ilks("GNT");
         assertEq(spot, 100 * ONE * ONE / 1500000000 ether);
 
-        manager = new DssCdpManager(address(vat));
+        manager = new MrsCdpManager(address(vat));
         DSProxyFactory factory = new DSProxyFactory();
         registry = new ProxyRegistry(address(factory));
-        dssProxyActions = address(new DssProxyActions());
-        dssProxyActionsEnd = address(new DssProxyActionsEnd());
-        dssProxyActionsDsr = address(new DssProxyActionsDsr());
+        mrsProxyActions = address(new MrsProxyActions());
+        mrsProxyActionsEnd = address(new MrsProxyActionsEnd());
+        mrsProxyActionsMsr = address(new MrsProxyActionsMsr());
         proxy = DSProxy(registry.build());
     }
 
