@@ -1,9 +1,9 @@
-# dss-proxy-actions
-Proxy functions to be used via ds-proxy. These functions are based on `dss-cdp-manager` as CDP registry.
+# mrs-proxy-actions
+Proxy functions to be used via ds-proxy. These functions are based on `mrs-cdp-manager` as CDP registry.
 
-https://github.com/makerdao/dss-proxy-actions
+https://github.com/sweatdao/mrs-proxy-actions
 
-## DssProxyActions
+## MrsProxyActions
 
 `open(address manager, bytes32 ilk, address usr)`: creates an `UrnHandler` (`cdp`) for the address `usr` (for a specific `ilk`) and allows to manage it via the internal registry of the `manager`.
 
@@ -17,7 +17,7 @@ https://github.com/makerdao/dss-proxy-actions
 
 `flux(address manager, uint cdp, address dst, uint wad)`: moves `wad` amount of collateral from `cdp` address to `dst` address.
 
-`move(address manager, uint cdp, address dst, uint rad)`: moves `rad` amount of DAI from `cdp` address to `dst` address.
+`move(address manager, uint cdp, address dst, uint rad)`: moves `rad` amount of MAI from `cdp` address to `dst` address.
 
 `frob(address manager, uint cdp, int dink, int dart)`: executes `frob` to `cdp` address assigning the collateral freed and/or DAI drawn to the same address.
 
@@ -39,13 +39,13 @@ https://github.com/makerdao/dss-proxy-actions
 
 `freeGem(address manager, address gemJoin, uint cdp, uint wad)`: executes `frob` to `cdp` decreasing locked collateral and withdraws `wad` amount of collateral from `gemJoin` adapter.
 
-`draw(address manager, address jug, address daiJoin, uint cdp, uint wad)`: updates collateral fee rate, executes `frob` to `cdp` increasing debt and exits `wad` amount of DAI token (minting it) from `daiJoin` adapter.
+`draw(address manager, address jug, address daiJoin, uint cdp, uint wad)`: updates collateral fee rate, executes `frob` to `cdp` increasing debt and exits `wad` amount of MAI token (minting it) from `maiJoin` adapter.
 
-`wipe(address manager, address daiJoin, uint cdp, uint wad)`: joins `wad` amount of DAI token to `daiJoin` adapter (burning it) and executes `frob` to `cdp` for decreasing debt.
+`wipe(address manager, address daiJoin, uint cdp, uint wad)`: joins `wad` amount of MAI token to `daiJoin` adapter (burning it) and executes `frob` to `cdp` for decreasing debt.
 
 `safeWipe(address manager, address daiJoin, uint cdp, uint wad, address owner)`: same than `wipe` but requiring `owner == cdp owner`.
 
-`wipeAll(address manager, address daiJoin, uint cdp)`: joins all the necessary amount of DAI token to `daiJoin` adapter (burning it) and executes `frob` to `cdp` setting the debt to zero.
+`wipeAll(address manager, address daiJoin, uint cdp)`: joins all the necessary amount of MAI token to `daiJoin` adapter (burning it) and executes `frob` to `cdp` setting the debt to zero.
 
 `safeWipeAll(address manager, address daiJoin, uint cdp, address owner)`: same than `wipeAll` but requiring `owner == cdp owner`.
 
@@ -67,28 +67,28 @@ https://github.com/makerdao/dss-proxy-actions
 
 `openLockGNTAndDraw(address manager, address jug, address gntJoin, address daiJoin, bytes32 ilk, uint wadC, uint wadD)`: like `openLockGemAndDraw` but specially for GNT token.
 
-## DssProxyActionsFlip
+## MrsProxyActionsFlip
 
 `exitETH(address manager, address ethJoin, uint cdp, uint wad)`: exits `wad` amount of ETH from `ethJoin` adapter (received in the `cdp` urn after the liquidation auction is over).
 
 `exitGem(address manager, address gemJoin, uint cdp, uint wad)`: exits `wad` amount of collateral from `gemJoin` adapter (received in the `cdp` urn after the liquidation auction is over).
 
-## DssProxyActionsEnd
+## MrsProxyActionsEnd
 
 `freeETH(address manager, address ethJoin, address end, uint cdp)`: after system is caged, recovers remaining ETH from `cdp` (pays remaining debt if exists).
 
 `freeGem(address manager, address gemJoin, address end, uint cdp)`: after system is caged, recovers remaining token from `cdp` (pays remaining debt if exists).
 
-`pack(address daiJoin, address end, uint wad)`: after system is caged, packs `wad` amount of DAI to be ready for cashing.
+`pack(address daiJoin, address end, uint wad)`: after system is caged, packs `wad` amount of MAI to be ready for cashing.
 
-`cashETH(address ethJoin, address end, bytes32 ilk, uint wad)`: after system is caged, cashes `wad` amount of previously packed DAI and returns the equivalent in ETH.
+`cashETH(address ethJoin, address end, bytes32 ilk, uint wad)`: after system is caged, cashes `wad` amount of previously packed MAI and returns the equivalent in ETH.
 
-`cashGem(address gemJoin, address end, bytes32 ilk, uint wad)`: after system is caged, cashes `wad` amount of previously packed DAI and returns the equivalent in token.
+`cashGem(address gemJoin, address end, bytes32 ilk, uint wad)`: after system is caged, cashes `wad` amount of previously packed MAI and returns the equivalent in token.
 
-## DssProxyActionsDsr
+## MrsProxyActionsMsr
 
-`join(address daiJoin, address pot, uint wad)`: joins `wad` amount of DAI token to `daiJoin` adapter (burning it) and moves balance to `pot` for DAI Saving Rates.
+`join(address maiJoin, address pot, uint wad)`: joins `wad` amount of MAI token to `maiJoin` adapter (burning it) and moves balance to `pot` for MAI Saving Rates.
 
-`exit(address daiJoin, address pot, uint wad)`: retrieves `wad` amount of DAI from `pot` and exits DAI token from `daiJoin` adapter (minting it).
+`exit(address daiJoin, address pot, uint wad)`: retrieves `wad` amount of MAI from `pot` and exits MAI token from `maiJoin` adapter (minting it).
 
-`exitAll(address daiJoin, address pot)`: same than `exit` but all the available amount.
+`exitAll(address maiJoin, address pot)`: same than `exit` but all the available amount.
