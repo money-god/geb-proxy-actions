@@ -273,7 +273,7 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
 
     function setUp() public {
         super.setUp();
-        deployKeepAuth();
+        deployBondKeepAuth();
 
         // Add a token collateral
         dgd = new DGD(1000 * 10 ** 9);
@@ -281,7 +281,7 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         pipDGD = new DSValue();
         mrsDeploy.deployCollateral("DGD", address(dgdJoin), address(pipDGD), 5 * 10**26);
         (dgdFlip, ) = mrsDeploy.ilks("DGD");
-        pipDGD.poke(bytes32(uint(50 ether))); // Price 50 MAI = 1 DGD (in precision 18)
+        pipDGD.poke(bytes32(uint(50 ether))); // Price 50 COIN = 1 DGD (in precision 18)
         this.file(address(spotter), "DGD", "tam", uint(1500000000 ether));
         this.file(address(spotter), "DGD", "mat", uint(1500000000 ether)); // Liquidation ratio 150%
         this.file(address(vat), bytes32("DGD"), bytes32("line"), uint(10000 * 10 ** 45));
@@ -293,7 +293,7 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         gntJoin = new GemJoin4(address(vat), "GNT", address(gnt));
         pipGNT = new DSValue();
         mrsDeploy.deployCollateral("GNT", address(gntJoin), address(pipGNT), 5 * 10**26);
-        pipGNT.poke(bytes32(uint(100 ether))); // Price 100 MAI = 1 GNT
+        pipGNT.poke(bytes32(uint(100 ether))); // Price 100 COIN = 1 GNT
         this.file(address(spotter), "GNT", "tam", uint(1500000000 ether));
         this.file(address(spotter), "GNT", "mat", uint(1500000000 ether)); // Liquidation ratio 150%
         this.file(address(vat), bytes32("GNT"), bytes32("line"), uint(10000 * 10 ** 45));
@@ -383,7 +383,7 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
     function testFlux() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
 
-        assertEq(mai.balanceOf(address(this)), 0);
+        assertEq(coin.balanceOf(address(this)), 0);
         weth.deposit.value(1 ether)();
         weth.approve(address(ethJoin), uint(-1));
         ethJoin.join(manager.urns(cdp), 1 ether);
@@ -399,23 +399,23 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
     function testFrob() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
 
-        assertEq(mai.balanceOf(address(this)), 0);
+        assertEq(coin.balanceOf(address(this)), 0);
         weth.deposit.value(1 ether)();
         weth.approve(address(ethJoin), uint(-1));
         ethJoin.join(manager.urns(cdp), 1 ether);
 
         this.frob(address(manager), cdp, 0.5 ether, 60 ether);
         assertEq(vat.gem("ETH", manager.urns(cdp)), 0.5 ether);
-        assertEq(vat.mai(manager.urns(cdp)), mul(ONE, 60 ether));
-        assertEq(vat.mai(address(this)), 0);
+        assertEq(vat.good(manager.urns(cdp)), mul(ONE, 60 ether));
+        assertEq(vat.good(address(this)), 0);
 
         this.move(address(manager), cdp, address(this), mul(ONE, 60 ether));
-        assertEq(vat.mai(manager.urns(cdp)), 0);
-        assertEq(vat.mai(address(this)), mul(ONE, 60 ether));
+        assertEq(vat.good(manager.urns(cdp)), 0);
+        assertEq(vat.good(address(this)), mul(ONE, 60 ether));
 
-        vat.hope(address(maiJoin));
-        maiJoin.exit(address(this), 60 ether);
-        assertEq(mai.balanceOf(address(this)), 60 ether);
+        vat.hope(address(coinJoin));
+        coinJoin.exit(address(this), 60 ether);
+        assertEq(coin.balanceOf(address(this)), 60 ether);
     }
 
     function testLockETH() public {
@@ -560,9 +560,9 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
     function testDraw() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        assertEq(mai.balanceOf(address(this)), 0);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        assertEq(mai.balanceOf(address(this)), 300 ether);
+        assertEq(coin.balanceOf(address(this)), 0);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        assertEq(coin.balanceOf(address(this)), 300 ether);
         assertEq(art("ETH", manager.urns(cdp)), 300 ether);
     }
 
@@ -572,79 +572,79 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         jug.drip("ETH"); // This is actually not necessary as `draw` will also call drip
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        assertEq(mai.balanceOf(address(this)), 0);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        assertEq(mai.balanceOf(address(this)), 300 ether);
+        assertEq(coin.balanceOf(address(this)), 0);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        assertEq(coin.balanceOf(address(this)), 300 ether);
         assertEq(art("ETH", manager.urns(cdp)), mul(300 ether, ONE) / (1.05 * 10 ** 27) + 1); // Extra wei due rounding
     }
 
     function testWipe() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 100 ether);
-        this.wipe(address(manager), address(maiJoin), cdp, 100 ether);
-        assertEq(mai.balanceOf(address(this)), 200 ether);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 100 ether);
+        this.wipe(address(manager), address(coinJoin), cdp, 100 ether);
+        assertEq(coin.balanceOf(address(this)), 200 ether);
         assertEq(art("ETH", manager.urns(cdp)), 200 ether);
     }
 
     function testWipeAll() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 300 ether);
-        this.wipeAll(address(manager), address(maiJoin), cdp);
-        assertEq(mai.balanceOf(address(this)), 0);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 300 ether);
+        this.wipeAll(address(manager), address(coinJoin), cdp);
+        assertEq(coin.balanceOf(address(this)), 0);
         assertEq(art("ETH", manager.urns(cdp)), 0);
     }
 
     function testSafeWipe() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 100 ether);
-        this.safeWipe(address(manager), address(maiJoin), cdp, 100 ether, address(proxy));
-        assertEq(mai.balanceOf(address(this)), 200 ether);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 100 ether);
+        this.safeWipe(address(manager), address(coinJoin), cdp, 100 ether, address(proxy));
+        assertEq(coin.balanceOf(address(this)), 200 ether);
         assertEq(art("ETH", manager.urns(cdp)), 200 ether);
     }
 
     function testSafeWipeAll() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 300 ether);
-        this.safeWipeAll(address(manager), address(maiJoin), cdp, address(proxy));
-        assertEq(mai.balanceOf(address(this)), 0);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 300 ether);
+        this.safeWipeAll(address(manager), address(coinJoin), cdp, address(proxy));
+        assertEq(coin.balanceOf(address(this)), 0);
         assertEq(art("ETH", manager.urns(cdp)), 0);
     }
 
     function testWipeOtherCDPOwner() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 100 ether);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 100 ether);
         this.give(address(manager), cdp, address(123));
-        this.wipe(address(manager), address(maiJoin), cdp, 100 ether);
-        assertEq(mai.balanceOf(address(this)), 200 ether);
+        this.wipe(address(manager), address(coinJoin), cdp, 100 ether);
+        assertEq(coin.balanceOf(address(this)), 200 ether);
         assertEq(art("ETH", manager.urns(cdp)), 200 ether);
     }
 
     function testFailSafeWipeOtherCDPOwner() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 100 ether);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 100 ether);
         this.give(address(manager), cdp, address(123));
-        this.safeWipe(address(manager), address(maiJoin), cdp, 100 ether, address(321));
+        this.safeWipe(address(manager), address(coinJoin), cdp, 100 ether, address(321));
     }
 
     function testFailSafeWipeAllOtherCDPOwner() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 300 ether);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 300 ether);
         this.give(address(manager), cdp, address(123));
-        this.safeWipeAll(address(manager), address(maiJoin), cdp, address(321));
+        this.safeWipeAll(address(manager), address(coinJoin), cdp, address(321));
     }
 
     function testWipeAfterDrip() public {
@@ -653,10 +653,10 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         jug.drip("ETH");
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 100 ether);
-        this.wipe(address(manager), address(maiJoin), cdp, 100 ether);
-        assertEq(mai.balanceOf(address(this)), 200 ether);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 100 ether);
+        this.wipe(address(manager), address(coinJoin), cdp, 100 ether);
+        assertEq(coin.balanceOf(address(this)), 200 ether);
         assertEq(art("ETH", manager.urns(cdp)), mul(200 ether, ONE) / (1.05 * 10 ** 27) + 1);
     }
 
@@ -666,9 +666,9 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         jug.drip("ETH");
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
-        this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 300 ether);
-        this.wipe(address(manager), address(maiJoin), cdp, 300 ether);
+        this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 300 ether);
+        this.wipe(address(manager), address(coinJoin), cdp, 300 ether);
         assertEq(art("ETH", manager.urns(cdp)), 0);
     }
 
@@ -680,10 +680,10 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         uint times = 30;
         this.lockETH.value(2 ether * times)(address(manager), address(ethJoin), cdp);
         for (uint i = 0; i < times; i++) {
-            this.draw(address(manager), address(jug), address(maiJoin), cdp, 300 ether);
+            this.draw(address(manager), address(jug), address(coinJoin), cdp, 300 ether);
         }
-        mai.approve(address(proxy), 300 ether * times);
-        this.wipe(address(manager), address(maiJoin), cdp, 300 ether * times);
+        coin.approve(address(proxy), 300 ether * times);
+        this.wipe(address(manager), address(coinJoin), cdp, 300 ether * times);
         assertEq(art("ETH", manager.urns(cdp)), 0);
     }
 
@@ -691,19 +691,19 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         uint initialBalance = address(this).balance;
         assertEq(ink("ETH", manager.urns(cdp)), 0);
-        assertEq(mai.balanceOf(address(this)), 0);
-        this.lockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(maiJoin), cdp, 300 ether);
+        assertEq(coin.balanceOf(address(this)), 0);
+        this.lockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(coinJoin), cdp, 300 ether);
         assertEq(ink("ETH", manager.urns(cdp)), 2 ether);
-        assertEq(mai.balanceOf(address(this)), 300 ether);
+        assertEq(coin.balanceOf(address(this)), 300 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
     }
 
     function testOpenLockETHAndDraw() public {
         uint initialBalance = address(this).balance;
-        assertEq(mai.balanceOf(address(this)), 0);
-        uint cdp = this.openLockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(maiJoin), "ETH", 300 ether);
+        assertEq(coin.balanceOf(address(this)), 0);
+        uint cdp = this.openLockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(coinJoin), "ETH", 300 ether);
         assertEq(ink("ETH", manager.urns(cdp)), 2 ether);
-        assertEq(mai.balanceOf(address(this)), 300 ether);
+        assertEq(coin.balanceOf(address(this)), 300 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
     }
 
@@ -712,10 +712,10 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         uint cdp = this.open(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 2 ether);
         assertEq(ink("COL", manager.urns(cdp)), 0);
-        assertEq(mai.balanceOf(address(this)), 0);
-        this.lockGemAndDraw(address(manager), address(jug), address(colJoin), address(maiJoin), cdp, 2 ether, 10 ether, true);
+        assertEq(coin.balanceOf(address(this)), 0);
+        this.lockGemAndDraw(address(manager), address(jug), address(colJoin), address(coinJoin), cdp, 2 ether, 10 ether, true);
         assertEq(ink("COL", manager.urns(cdp)), 2 ether);
-        assertEq(mai.balanceOf(address(this)), 10 ether);
+        assertEq(coin.balanceOf(address(this)), 10 ether);
         assertEq(col.balanceOf(address(this)), 3 ether);
     }
 
@@ -724,9 +724,9 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         dgd.approve(address(proxy), 3 * 10 ** 9);
         assertEq(ink("DGD", manager.urns(cdp)), 0);
         uint prevBalance = dgd.balanceOf(address(this));
-        this.lockGemAndDraw(address(manager), address(jug), address(dgdJoin), address(maiJoin), cdp, 3 * 10 ** 9, 50 ether, true);
+        this.lockGemAndDraw(address(manager), address(jug), address(dgdJoin), address(coinJoin), cdp, 3 * 10 ** 9, 50 ether, true);
         assertEq(ink("DGD", manager.urns(cdp)), 3 ether);
-        assertEq(mai.balanceOf(address(this)), 50 ether);
+        assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(dgd.balanceOf(address(this)), prevBalance - 3 * 10 ** 9);
     }
 
@@ -736,74 +736,74 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         uint prevBalance = gnt.balanceOf(address(this));
         address bag = this.makeGemBag(address(gntJoin));
         gnt.transfer(bag, 3 ether);
-        this.lockGemAndDraw(address(manager), address(jug), address(gntJoin), address(maiJoin), cdp, 3 ether, 50 ether, false);
+        this.lockGemAndDraw(address(manager), address(jug), address(gntJoin), address(coinJoin), cdp, 3 ether, 50 ether, false);
         assertEq(ink("GNT", manager.urns(cdp)), 3 ether);
-        assertEq(mai.balanceOf(address(this)), 50 ether);
+        assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(gnt.balanceOf(address(this)), prevBalance - 3 ether);
     }
 
     function testOpenLockGemAndDraw() public {
         col.mint(5 ether);
         col.approve(address(proxy), 2 ether);
-        assertEq(mai.balanceOf(address(this)), 0);
-        uint cdp = this.openLockGemAndDraw(address(manager), address(jug), address(colJoin), address(maiJoin), "COL", 2 ether, 10 ether, true);
+        assertEq(coin.balanceOf(address(this)), 0);
+        uint cdp = this.openLockGemAndDraw(address(manager), address(jug), address(colJoin), address(coinJoin), "COL", 2 ether, 10 ether, true);
         assertEq(ink("COL", manager.urns(cdp)), 2 ether);
-        assertEq(mai.balanceOf(address(this)), 10 ether);
+        assertEq(coin.balanceOf(address(this)), 10 ether);
         assertEq(col.balanceOf(address(this)), 3 ether);
     }
 
     function testOpenLockGemGNTAndDraw() public {
-        assertEq(mai.balanceOf(address(this)), 0);
+        assertEq(coin.balanceOf(address(this)), 0);
         address bag = this.makeGemBag(address(gntJoin));
         assertEq(address(bag), gntJoin.bags(address(proxy)));
         gnt.transfer(bag, 2 ether);
-        uint cdp = this.openLockGemAndDraw(address(manager), address(jug), address(gntJoin), address(maiJoin), "GNT", 2 ether, 10 ether, false);
+        uint cdp = this.openLockGemAndDraw(address(manager), address(jug), address(gntJoin), address(coinJoin), "GNT", 2 ether, 10 ether, false);
         assertEq(ink("GNT", manager.urns(cdp)), 2 ether);
-        assertEq(mai.balanceOf(address(this)), 10 ether);
+        assertEq(coin.balanceOf(address(this)), 10 ether);
     }
 
     function testOpenLockGemGNTAndDrawSafe() public {
-        assertEq(mai.balanceOf(address(this)), 0);
+        assertEq(coin.balanceOf(address(this)), 0);
         gnt.transfer(address(proxy), 2 ether);
-        (address bag, uint cdp) = this.openLockGNTAndDraw(address(manager), address(jug), address(gntJoin), address(maiJoin), "GNT", 2 ether, 10 ether);
+        (address bag, uint cdp) = this.openLockGNTAndDraw(address(manager), address(jug), address(gntJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
         assertEq(address(bag), gntJoin.bags(address(proxy)));
         assertEq(ink("GNT", manager.urns(cdp)), 2 ether);
-        assertEq(mai.balanceOf(address(this)), 10 ether);
+        assertEq(coin.balanceOf(address(this)), 10 ether);
     }
 
     function testOpenLockGemGNTAndDrawSafeTwice() public {
-        assertEq(mai.balanceOf(address(this)), 0);
+        assertEq(coin.balanceOf(address(this)), 0);
         gnt.transfer(address(proxy), 4 ether);
-        (address bag, uint cdp) = this.openLockGNTAndDraw(address(manager), address(jug), address(gntJoin), address(maiJoin), "GNT", 2 ether, 10 ether);
-        (address bag2, uint cdp2) = this.openLockGNTAndDraw(address(manager), address(jug), address(gntJoin), address(maiJoin), "GNT", 2 ether, 10 ether);
+        (address bag, uint cdp) = this.openLockGNTAndDraw(address(manager), address(jug), address(gntJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
+        (address bag2, uint cdp2) = this.openLockGNTAndDraw(address(manager), address(jug), address(gntJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
         assertEq(address(bag), gntJoin.bags(address(proxy)));
         assertEq(address(bag), address(bag2));
         assertEq(ink("GNT", manager.urns(cdp)), 2 ether);
         assertEq(ink("GNT", manager.urns(cdp2)), 2 ether);
-        assertEq(mai.balanceOf(address(this)), 20 ether);
+        assertEq(coin.balanceOf(address(this)), 20 ether);
     }
 
     function testWipeAndFreeETH() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         uint initialBalance = address(this).balance;
-        this.lockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 250 ether);
-        this.wipeAndFreeETH(address(manager), address(ethJoin), address(maiJoin), cdp, 1.5 ether, 250 ether);
+        this.lockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 250 ether);
+        this.wipeAndFreeETH(address(manager), address(ethJoin), address(coinJoin), cdp, 1.5 ether, 250 ether);
         assertEq(ink("ETH", manager.urns(cdp)), 0.5 ether);
         assertEq(art("ETH", manager.urns(cdp)), 50 ether);
-        assertEq(mai.balanceOf(address(this)), 50 ether);
+        assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(address(this).balance, initialBalance - 0.5 ether);
     }
 
     function testWipeAllAndFreeETH() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
         uint initialBalance = address(this).balance;
-        this.lockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(maiJoin), cdp, 300 ether);
-        mai.approve(address(proxy), 300 ether);
-        this.wipeAllAndFreeETH(address(manager), address(ethJoin), address(maiJoin), cdp, 1.5 ether);
+        this.lockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(coinJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 300 ether);
+        this.wipeAllAndFreeETH(address(manager), address(ethJoin), address(coinJoin), cdp, 1.5 ether);
         assertEq(ink("ETH", manager.urns(cdp)), 0.5 ether);
         assertEq(art("ETH", manager.urns(cdp)), 0);
-        assertEq(mai.balanceOf(address(this)), 0);
+        assertEq(coin.balanceOf(address(this)), 0);
         assertEq(address(this).balance, initialBalance - 0.5 ether);
     }
 
@@ -811,12 +811,12 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         col.mint(5 ether);
         uint cdp = this.open(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 2 ether);
-        this.lockGemAndDraw(address(manager), address(jug), address(colJoin), address(maiJoin), cdp, 2 ether, 10 ether, true);
-        mai.approve(address(proxy), 8 ether);
-        this.wipeAndFreeGem(address(manager), address(colJoin), address(maiJoin), cdp, 1.5 ether, 8 ether);
+        this.lockGemAndDraw(address(manager), address(jug), address(colJoin), address(coinJoin), cdp, 2 ether, 10 ether, true);
+        coin.approve(address(proxy), 8 ether);
+        this.wipeAndFreeGem(address(manager), address(colJoin), address(coinJoin), cdp, 1.5 ether, 8 ether);
         assertEq(ink("COL", manager.urns(cdp)), 0.5 ether);
         assertEq(art("COL", manager.urns(cdp)), 2 ether);
-        assertEq(mai.balanceOf(address(this)), 2 ether);
+        assertEq(coin.balanceOf(address(this)), 2 ether);
         assertEq(col.balanceOf(address(this)), 4.5 ether);
     }
 
@@ -824,12 +824,12 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         col.mint(5 ether);
         uint cdp = this.open(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 2 ether);
-        this.lockGemAndDraw(address(manager), address(jug), address(colJoin), address(maiJoin), cdp, 2 ether, 10 ether, true);
-        mai.approve(address(proxy), 10 ether);
-        this.wipeAllAndFreeGem(address(manager), address(colJoin), address(maiJoin), cdp, 1.5 ether);
+        this.lockGemAndDraw(address(manager), address(jug), address(colJoin), address(coinJoin), cdp, 2 ether, 10 ether, true);
+        coin.approve(address(proxy), 10 ether);
+        this.wipeAllAndFreeGem(address(manager), address(colJoin), address(coinJoin), cdp, 1.5 ether);
         assertEq(ink("COL", manager.urns(cdp)), 0.5 ether);
         assertEq(art("COL", manager.urns(cdp)), 0);
-        assertEq(mai.balanceOf(address(this)), 0);
+        assertEq(coin.balanceOf(address(this)), 0);
         assertEq(col.balanceOf(address(this)), 4.5 ether);
     }
 
@@ -838,17 +838,17 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         dgd.approve(address(proxy), 3 * 10 ** 9);
         assertEq(ink("DGD", manager.urns(cdp)), 0);
         uint prevBalance = dgd.balanceOf(address(this));
-        this.lockGemAndDraw(address(manager), address(jug), address(dgdJoin), address(maiJoin), cdp, 3 * 10 ** 9, 50 ether, true);
-        mai.approve(address(proxy), 25 ether);
-        this.wipeAndFreeGem(address(manager), address(dgdJoin), address(maiJoin), cdp, 1 * 10 ** 9, 25 ether);
+        this.lockGemAndDraw(address(manager), address(jug), address(dgdJoin), address(coinJoin), cdp, 3 * 10 ** 9, 50 ether, true);
+        coin.approve(address(proxy), 25 ether);
+        this.wipeAndFreeGem(address(manager), address(dgdJoin), address(coinJoin), cdp, 1 * 10 ** 9, 25 ether);
         assertEq(ink("DGD", manager.urns(cdp)), 2 ether);
-        assertEq(mai.balanceOf(address(this)), 25 ether);
+        assertEq(coin.balanceOf(address(this)), 25 ether);
         assertEq(dgd.balanceOf(address(this)), prevBalance - 2 * 10 ** 9);
     }
 
     function testPreventHigherDaiOnWipe() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
-        this.lockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(maiJoin), cdp, 300 ether);
+        this.lockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(coinJoin), cdp, 300 ether);
 
         weth.deposit.value(2 ether)();
         weth.approve(address(ethJoin), 2 ether);
@@ -856,8 +856,8 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         vat.frob("ETH", address(this), address(this), address(this), 1 ether, 150 ether);
         vat.move(address(this), manager.urns(cdp), 150 ether);
 
-        mai.approve(address(proxy), 300 ether);
-        this.wipe(address(manager), address(maiJoin), cdp, 300 ether);
+        coin.approve(address(proxy), 300 ether);
+        this.wipe(address(manager), address(coinJoin), cdp, 300 ether);
     }
 
     function testHopeNope() public {
@@ -870,7 +870,7 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
 
     function testQuit() public {
         uint cdp = this.open(address(manager), "ETH", address(proxy));
-        this.lockETHAndDraw.value(1 ether)(address(manager), address(jug), address(ethJoin), address(maiJoin), cdp, 50 ether);
+        this.lockETHAndDraw.value(1 ether)(address(manager), address(jug), address(ethJoin), address(coinJoin), cdp, 50 ether);
 
         assertEq(ink("ETH", manager.urns(cdp)), 1 ether);
         assertEq(art("ETH", manager.urns(cdp)), 50 ether);
@@ -910,7 +910,7 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
 
     function testShift() public {
         uint cdpSrc = this.open(address(manager), "ETH", address(proxy));
-        this.lockETHAndDraw.value(1 ether)(address(manager), address(jug), address(ethJoin), address(maiJoin), cdpSrc, 50 ether);
+        this.lockETHAndDraw.value(1 ether)(address(manager), address(jug), address(ethJoin), address(coinJoin), cdpSrc, 50 ether);
 
         uint cdpDst = this.open(address(manager), "ETH", address(proxy));
 
@@ -932,7 +932,7 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         this.file(address(cat), "ETH", "chop", ONE);
 
         cdp = this.open(address(manager), "ETH", address(proxy));
-        this.lockETHAndDraw.value(1 ether)(address(manager), address(jug), address(ethJoin), address(maiJoin), cdp, 200 ether); // Maximun MAI generated
+        this.lockETHAndDraw.value(1 ether)(address(manager), address(jug), address(ethJoin), address(coinJoin), cdp, 200 ether); // Maximun COIN generated
         pipETH.poke(bytes32(uint(300 * 10 ** 18 - 1))); // Force liquidation
         spotter.poke("ETH");
         uint batchId = cat.bite("ETH", manager.urns(cdp));
@@ -970,7 +970,7 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         col.mint(1 ether);
         uint cdp = this.open(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 1 ether);
-        this.lockGemAndDraw(address(manager), address(jug), address(colJoin), address(maiJoin), cdp, 1 ether, 40 ether, true);
+        this.lockGemAndDraw(address(manager), address(jug), address(colJoin), address(coinJoin), cdp, 1 ether, 40 ether, true);
 
         pipCOL.poke(bytes32(uint(40 * 10 ** 18))); // Force liquidation
         spotter.poke("COL");
@@ -1003,7 +1003,7 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
 
         uint cdp = this.open(address(manager), "DGD", address(proxy));
         dgd.approve(address(proxy), 1 * 10 ** 9);
-        this.lockGemAndDraw(address(manager), address(jug), address(dgdJoin), address(maiJoin), cdp, 1 * 10 ** 9, 30 ether, true);
+        this.lockGemAndDraw(address(manager), address(jug), address(dgdJoin), address(coinJoin), cdp, 1 * 10 ** 9, 30 ether, true);
 
         pipDGD.poke(bytes32(uint(40 * 10 ** 18))); // Force liquidation
         spotter.poke("DGD");
@@ -1045,10 +1045,10 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         this.file(address(cat), "ETH", "lump", 1 ether); // 1 unit of collateral per batch
         this.file(address(cat), "ETH", "chop", ONE);
 
-        uint cdp = this.openLockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(maiJoin), "ETH", 300 ether);
+        uint cdp = this.openLockETHAndDraw.value(2 ether)(address(manager), address(jug), address(ethJoin), address(coinJoin), "ETH", 300 ether);
         col.mint(1 ether);
         col.approve(address(proxy), 1 ether);
-        uint cdp2 = this.openLockGemAndDraw(address(manager), address(jug), address(colJoin), address(maiJoin), "COL", 1 ether, 5 ether, true);
+        uint cdp2 = this.openLockGemAndDraw(address(manager), address(jug), address(colJoin), address(coinJoin), "COL", 1 ether, 5 ether, true);
 
         this.cage(address(end));
         end.cage("ETH");
@@ -1067,24 +1067,24 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         (inkV, artV) = vat.urns("ETH", manager.urns(cdp));
         assertEq(inkV, 0);
         assertEq(artV, 0);
-        uint remainInkVal = 2 ether - 300 * end.tag("ETH") / 10 ** 9; // 2 ETH (deposited) - 300 MAI debt * ETH cage price
-        assertEq(address(this).balance, prevBalanceETH + remainInkVal);
+        uint recoinnInkVal = 2 ether - 300 * end.tag("ETH") / 10 ** 9; // 2 ETH (deposited) - 300 COIN debt * ETH cage price
+        assertEq(address(this).balance, prevBalanceETH + recoinnInkVal);
 
         uint prevBalanceCol = col.balanceOf(address(this));
         this.end_freeGem(address(manager), address(colJoin), address(end), cdp2);
         (inkV, artV) = vat.urns("COL", manager.urns(cdp2));
         assertEq(inkV, 0);
         assertEq(artV, 0);
-        remainInkVal = 1 ether - 5 * end.tag("COL") / 10 ** 9; // 1 COL (deposited) - 5 MAI debt * COL cage price
-        assertEq(col.balanceOf(address(this)), prevBalanceCol + remainInkVal);
+        recoinnInkVal = 1 ether - 5 * end.tag("COL") / 10 ** 9; // 1 COL (deposited) - 5 COIN debt * COL cage price
+        assertEq(col.balanceOf(address(this)), prevBalanceCol + recoinnInkVal);
 
         end.thaw();
 
         end.flow("ETH");
         end.flow("COL");
 
-        mai.approve(address(proxy), 305 ether);
-        this.end_pack(address(maiJoin), address(end), 305 ether);
+        coin.approve(address(proxy), 305 ether);
+        this.end_pack(address(coinJoin), address(end), 305 ether);
 
         this.end_cashETH(address(ethJoin), address(end), "ETH", 305 ether);
         this.end_cashGem(address(colJoin), address(end), "COL", 305 ether);
