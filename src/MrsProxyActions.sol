@@ -888,7 +888,7 @@ contract MrsProxyActionsEnd is Common {
     }
 }
 
-contract MrsProxyActionsMsr is Common {
+contract MrsProxyActionsSr is Common {
     function join(
         address coinJoin,
         address pot,

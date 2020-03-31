@@ -85,7 +85,7 @@ https://github.com/sweatdao/mrs-proxy-actions
 
 `cashGem(address gemJoin, address end, bytes32 ilk, uint wad)`: after system is caged, cashes `wad` amount of previously packed MAI and returns the equivalent in token.
 
-## MrsProxyActionsMsr
+## MrsProxyActionsSr
 
 `join(address maiJoin, address pot, uint wad)`: joins `wad` amount of MAI token to `maiJoin` adapter (burning it) and moves balance to `pot` for MAI Saving Rates.
 

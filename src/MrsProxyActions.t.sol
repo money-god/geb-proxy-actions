@@ -15,7 +15,7 @@ contract ProxyCalls {
     DSProxy proxy;
     address mrsProxyActions;
     address mrsProxyActionsEnd;
-    address mrsProxyActionsMsr;
+    address mrsProxyActionsSr;
 
     function transfer(address, address, uint256) public {
         proxy.execute(mrsProxyActions, msg.data);
@@ -237,15 +237,15 @@ contract ProxyCalls {
     }
 
     function msr_join(address a, address b, uint c) public {
-        proxy.execute(mrsProxyActionsMsr, abi.encodeWithSignature("join(address,address,uint256)", a, b, c));
+        proxy.execute(mrsProxyActionsSr, abi.encodeWithSignature("join(address,address,uint256)", a, b, c));
     }
 
     function msr_exit(address a, address b, uint c) public {
-        proxy.execute(mrsProxyActionsMsr, abi.encodeWithSignature("exit(address,address,uint256)", a, b, c));
+        proxy.execute(mrsProxyActionsSr, abi.encodeWithSignature("exit(address,address,uint256)", a, b, c));
     }
 
     function msr_exitAll(address a, address b) public {
-        proxy.execute(mrsProxyActionsMsr, abi.encodeWithSignature("exitAll(address,address)", a, b));
+        proxy.execute(mrsProxyActionsSr, abi.encodeWithSignature("exitAll(address,address)", a, b));
     }
 }
 
@@ -306,7 +306,7 @@ contract MrsProxyActionsTest is MrsDeployTestBase, ProxyCalls {
         registry = new ProxyRegistry(address(factory));
         mrsProxyActions = address(new MrsProxyActions());
         mrsProxyActionsEnd = address(new MrsProxyActionsEnd());
-        mrsProxyActionsMsr = address(new MrsProxyActionsMsr());
+        mrsProxyActionsSr = address(new MrsProxyActionsSr());
         proxy = DSProxy(registry.build());
     }
 
