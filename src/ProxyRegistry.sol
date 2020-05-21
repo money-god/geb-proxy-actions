@@ -1,6 +1,6 @@
-pragma solidity >=0.5.15;
+pragma solidity ^0.5.15;
 
-import 'mrs-deploy/ds/proxy/proxy.sol';
+import 'ds-proxy/proxy.sol';
 
 // This Registry deploys new proxy instances through DSProxyFactory.build(address) and keeps a registry of owner => proxy
 contract ProxyRegistry {

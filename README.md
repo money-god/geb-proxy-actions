@@ -1,9 +1,10 @@
-# mrs-proxy-actions
-Proxy functions to be used via ds-proxy. These functions are based on `mrs-cdp-manager` as CDP registry.
+# geb-proxy-actions
 
-https://github.com/sweatdao/mrs-proxy-actions
+Proxy functions to be used via ds-proxy. These functions are based on `geb-cdp-manager` as CDP registry.
 
-## MrsProxyActions
+https://github.com/reflexer-labs/geb-proxy-actions
+
+## GebProxyActions
 
 `open(address manager, bytes32 ilk, address usr)`: creates an `UrnHandler` (`cdp`) for the address `usr` (for a specific `ilk`) and allows to manage it via the internal registry of the `manager`.
 
@@ -13,9 +14,9 @@ https://github.com/sweatdao/mrs-proxy-actions
 
 `cdpAllow(address manager, uint cdp, address usr, uint ok)`: allows/denies `usr` address to manage the `cdp`.
 
-`urnAllow(address manager, address usr, uint ok)`: allows/denies `usr` address to manage the `msg.sender` address as `dst` for `quit`.
+`allowHandler(address manager, address usr, uint ok)`: allows/denies `usr` address to manage the `msg.sender` address as `dst` for `quit`.
 
-`flux(address manager, uint cdp, address dst, uint wad)`: moves `wad` amount of collateral from `cdp` address to `dst` address.
+`transferCollateral(address manager, uint cdp, address dst, uint wad)`: moves `wad` amount of collateral from `cdp` address to `dst` address.
 
 `move(address manager, uint cdp, address dst, uint rad)`: moves `rad` amount of MAI from `cdp` address to `dst` address.
 
@@ -33,7 +34,7 @@ https://github.com/sweatdao/mrs-proxy-actions
 
 `lockGem(address manager, address gemJoin, uint cdp, uint wad, bool transferFrom)`: deposits `wad` amount of collateral in `gemJoin` adapter and executes `frob` to `cdp` increasing the locked value. Gets funds from `msg.sender` if `transferFrom == true`.
 
-`safeLockGem(address manager, address gemJoin, uint cdp, uint wad, bool transferFrom, address owner)`: same than `lockGem` but requiring `owner == cdp owner`.
+`safeLockTokenCollateral(address manager, address gemJoin, uint cdp, uint wad, bool transferFrom, address owner)`: same than `lockGem` but requiring `owner == cdp owner`.
 
 `freeETH(address manager, address ethJoin, uint cdp, uint wad)`: executes `frob` to `cdp` decreasing locked collateral and withdraws `wad` amount of ETH from `ethJoin` adapter.
 
@@ -43,35 +44,35 @@ https://github.com/sweatdao/mrs-proxy-actions
 
 `wipe(address manager, address daiJoin, uint cdp, uint wad)`: joins `wad` amount of MAI token to `daiJoin` adapter (burning it) and executes `frob` to `cdp` for decreasing debt.
 
-`safeWipe(address manager, address daiJoin, uint cdp, uint wad, address owner)`: same than `wipe` but requiring `owner == cdp owner`.
+`safeRepayDebt(address manager, address daiJoin, uint cdp, uint wad, address owner)`: same than `wipe` but requiring `owner == cdp owner`.
 
-`wipeAll(address manager, address daiJoin, uint cdp)`: joins all the necessary amount of MAI token to `daiJoin` adapter (burning it) and executes `frob` to `cdp` setting the debt to zero.
+`repayAllDebt(address manager, address daiJoin, uint cdp)`: joins all the necessary amount of MAI token to `daiJoin` adapter (burning it) and executes `frob` to `cdp` setting the debt to zero.
 
-`safeWipeAll(address manager, address daiJoin, uint cdp, address owner)`: same than `wipeAll` but requiring `owner == cdp owner`.
+`safeRepayAllDebt(address manager, address daiJoin, uint cdp, address owner)`: same than `wipeAll` but requiring `owner == cdp owner`.
 
-`lockETHAndDraw(address manager, address jug, address ethJoin, address daiJoin, uint cdp, uint wadD)`: combines `lockETH` and `draw`.
+`lockETHAndGenerateDebt(address manager, address jug, address ethJoin, address daiJoin, uint cdp, uint wadD)`: combines `lockETH` and `draw`.
 
-`openLockETHAndDraw(address manager, address jug, address ethJoin, address daiJoin, bytes32 ilk, uint wadD)`: combines `open`, `lockETH` and `draw`.
+`openLockETHAndGenerateDebt(address manager, address jug, address ethJoin, address daiJoin, bytes32 ilk, uint wadD)`: combines `open`, `lockETH` and `draw`.
 
 `lockGemAndDraw(address manager, address jug, address gemJoin, address daiJoin, uint cdp, uint wadC, uint wadD, bool transferFrom)`: combines `lockGem` and `draw`.
 
-`openLockGemAndDraw(address manager, address jug, address gemJoin, address daiJoin, bytes32 ilk, uint wadC, uint wadD, bool transferFrom)`: combines `open`, `lockGem` and `draw`.
+`openLockTokenCollateralAndGenerateDebt(address manager, address jug, address gemJoin, address daiJoin, bytes32 ilk, uint wadC, uint wadD, bool transferFrom)`: combines `open`, `lockGem` and `draw`.
 
-`wipeAndFreeETH(address manager, address ethJoin, address daiJoin, uint cdp, uint wadC, uint wadD)`: combines `wipe` and `freeETH`.
+`repayDebtAndFreeETH(address manager, address ethJoin, address daiJoin, uint cdp, uint wadC, uint wadD)`: combines `wipe` and `freeETH`.
 
-`wipeAllAndFreeETH(address manager, address ethJoin, address daiJoin, uint cdp, uint wadC)`: combines `wipeAll` and `freeETH`.
+`repayAllDebtAndFreeETH(address manager, address ethJoin, address daiJoin, uint cdp, uint wadC)`: combines `wipeAll` and `freeETH`.
 
-`wipeAndFreeGem(address manager, address gemJoin, address daiJoin, uint cdp, uint wadC, uint wadD)`: combines `wipe` and `freeGem`.
+`repayDebtAndFreeTokenCollateral(address manager, address gemJoin, address daiJoin, uint cdp, uint wadC, uint wadD)`: combines `wipe` and `freeGem`.
 
-`wipeAllAndFreeGem(address manager, address gemJoin, address daiJoin, uint cdp, uint wadC)`: combines `wipeAll` and `freeGem`.
+`repayAllDebtAndFreeTokenCollateral(address manager, address gemJoin, address daiJoin, uint cdp, uint wadC)`: combines `wipeAll` and `freeGem`.
 
-`openLockGNTAndDraw(address manager, address jug, address gntJoin, address daiJoin, bytes32 ilk, uint wadC, uint wadD)`: like `openLockGemAndDraw` but specially for GNT token.
+`openLockGNTAndGenerateDebt(address manager, address jug, address gntJoin, address daiJoin, bytes32 ilk, uint wadC, uint wadD)`: like `openLockTokenCollateralAndGenerateDebt` but specially for GNT token.
 
 ## MrsProxyActionsFlip
 
 `exitETH(address manager, address ethJoin, uint cdp, uint wad)`: exits `wad` amount of ETH from `ethJoin` adapter (received in the `cdp` urn after the liquidation auction is over).
 
-`exitGem(address manager, address gemJoin, uint cdp, uint wad)`: exits `wad` amount of collateral from `gemJoin` adapter (received in the `cdp` urn after the liquidation auction is over).
+`exitTokenCollateral(address manager, address gemJoin, uint cdp, uint wad)`: exits `wad` amount of collateral from `gemJoin` adapter (received in the `cdp` urn after the liquidation auction is over).
 
 ## MrsProxyActionsEnd
 
@@ -79,11 +80,11 @@ https://github.com/sweatdao/mrs-proxy-actions
 
 `freeGem(address manager, address gemJoin, address end, uint cdp)`: after system is caged, recovers remaining token from `cdp` (pays remaining debt if exists).
 
-`pack(address daiJoin, address end, uint wad)`: after system is caged, packs `wad` amount of MAI to be ready for cashing.
+`prepareCoinsForRedeeming(address daiJoin, address end, uint wad)`: after system is caged, packs `wad` amount of MAI to be ready for cashing.
 
-`cashETH(address ethJoin, address end, bytes32 ilk, uint wad)`: after system is caged, cashes `wad` amount of previously packed MAI and returns the equivalent in ETH.
+`redeemETH(address ethJoin, address end, bytes32 ilk, uint wad)`: after system is caged, cashes `wad` amount of previously packed MAI and returns the equivalent in ETH.
 
-`cashGem(address gemJoin, address end, bytes32 ilk, uint wad)`: after system is caged, cashes `wad` amount of previously packed MAI and returns the equivalent in token.
+`redeemTokenCollateral(address gemJoin, address end, bytes32 ilk, uint wad)`: after system is caged, cashes `wad` amount of previously packed MAI and returns the equivalent in token.
 
 ## MrsProxyActionsSr
 
