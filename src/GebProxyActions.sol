@@ -65,9 +65,15 @@ contract GNTJoinLike {
     function make(address) public returns (address);
 }
 
+contract DSTokenLike {
+    function approve(address, uint) public;
+    function transfer(address, uint) public;
+    function transferFrom(address, address, uint) public;
+}
+
 contract CoinJoinLike {
     function cdpEngine() public returns (CDPEngineLike);
-    function coinBalance() public returns (CollateralLike);
+    function systemCoin() public returns (DSTokenLike);
     function join(address, uint) public payable;
     function exit(address, uint) public;
 }
@@ -119,12 +125,11 @@ contract Common {
     }
 
     // Public functions
-
     function coinJoin_join(address apt, address urn, uint wad) public {
         // Gets COIN from the user's wallet
-        CoinJoinLike(apt).coinBalance().transferFrom(msg.sender, address(this), wad);
+        CoinJoinLike(apt).systemCoin().transferFrom(msg.sender, address(this), wad);
         // Approves adapter to take the COIN amount
-        CoinJoinLike(apt).coinBalance().approve(apt, wad);
+        CoinJoinLike(apt).systemCoin().approve(apt, wad);
         // Joins COIN into the cdpEngine
         CoinJoinLike(apt).join(urn, wad);
     }
@@ -215,7 +220,6 @@ contract GebProxyActions is Common {
     }
 
     // Public functions
-
     function transfer(address collateral, address dst, uint amt) public {
         CollateralLike(collateral).transfer(dst, amt);
     }
@@ -526,7 +530,7 @@ contract GebProxyActions is Common {
         if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
             // Joins COIN amount into the cdpEngine
             coinJoin_join(coinJoin, cdpHandler, wad);
-            // Paybacks debt to the CDP
+            // // Paybacks debt to the CDP
             modifyCDPCollateralization(manager, cdp, 0, _getRepaidDeltaDebt(cdpEngine, CDPEngineLike(cdpEngine).coinBalance(cdpHandler), cdpHandler, collateralType));
         } else {
              // Joins COIN amount into the cdpEngine
