@@ -245,7 +245,7 @@ contract ProxyCalls {
         proxy.execute(gebProxyActionsCoinSavingsAccount, abi.encodeWithSignature("withdraw(address,address,uint256)", a, b, c));
     }
 
-    function coinSavingsAccount_exitAll(address a, address b) public {
+    function coinSavingsAccount_withdrawAll(address a, address b) public {
         proxy.execute(gebProxyActionsCoinSavingsAccount, abi.encodeWithSignature("withdrawAll(address,address)", a, b));
     }
 }
@@ -871,7 +871,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(cdpEngine.cdpRights(address(proxy), address(123)), 0);
     }
 
-    function testQuit() public {
+    function testQuitSystem() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
 
@@ -889,7 +889,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(generatedDebt("ETH", address(proxy)), 50 ether);
     }
 
-    function testEnter() public {
+    function testEnterSystem() public {
         weth.deposit.value(1 ether)();
         weth.approve(address(ethJoin), 1 ether);
         ethJoin.join(address(this), 1 ether);
@@ -911,7 +911,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(generatedDebt("ETH", address(this)), 0);
     }
 
-    function testShift() public {
+    function testMoveCDP() public {
         uint cdpSrc = this.openCDP(address(manager), "ETH", address(proxy));
         this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdpSrc, 50 ether);
 
@@ -931,15 +931,14 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     }
 
     function _collateralAuctionETH() internal returns (uint cdp) {
-        this.modifyParameters(address(cat), "ETH", "lump", 1 ether); // 1 unit of collateral per batch
-        this.modifyParameters(address(cat), "ETH", "chop", ONE);
+        this.modifyParameters(address(liquidationEngine), "ETH", "collateralToSell", 1 ether); // 1 unit of collateral per batch
+        this.modifyParameters(address(liquidationEngine), "ETH", "liquidationPenalty", ONE);
 
         cdp = this.openCDP(address(manager), "ETH", address(proxy));
         this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 200 ether); // Maximun COIN generated
-        pipETH.updateResult(bytes32(uint(300 * 10 ** 18 - 1))); // Force liquidation
+        orclETH.updateResult(bytes32(uint(300 * 10 ** 18 - 1))); // Force liquidation
         oracleRelayer.updateCollateralPrice("ETH");
-        uint batchId = cat.bite("ETH", manager.cdps(cdp));
-
+        uint batchId = liquidationEngine.liquidateCDP("ETH", manager.cdps(cdp));
 
         address(user1).transfer(10 ether);
         user1.doEthJoin(address(weth), address(ethJoin), address(user1), 10 ether);
@@ -949,12 +948,11 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
         user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
 
-        user1.doHope(address(cdpEngine), address(ethFlip));
-        user2.doHope(address(cdpEngine), address(ethFlip));
+        user1.doCDPApprove(address(cdpEngine), address(ethCollateralAuctionHouse));
+        user2.doCDPApprove(address(cdpEngine), address(ethCollateralAuctionHouse));
 
-        user1.doTend(address(ethFlip), batchId, 1 ether, rad(200 ether));
-
-        user2.doDent(address(ethFlip), batchId, 0.7 ether, rad(200 ether));
+        user1.doIncreaseBidSize(address(ethCollateralAuctionHouse), batchId, 1 ether, rad(200 ether));
+        user2.doDecreaseSoldAmount(address(ethCollateralAuctionHouse), batchId, 0.7 ether, rad(200 ether));
     }
 
     function testExitETHAfterCollateralAuction() public {
@@ -966,227 +964,227 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(address(this).balance, prevBalance + 0.3 ether);
     }
 
-//     function testExitTokenCollateralAfterFlip() public {
-//         this.modifyParameters(address(cat), "COL", "lump", 1 ether); // 1 unit of collateral per batch
-//         this.modifyParameters(address(cat), "COL", "chop", ONE);
-//
-//         col.mint(1 ether);
-//         uint cdp = this.openCDP(address(manager), "COL", address(proxy));
-//         col.approve(address(proxy), 1 ether);
-//         this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), cdp, 1 ether, 40 ether, true);
-//
-//         pipCOL.updateResult(bytes32(uint(40 * 10 ** 18))); // Force liquidation
-//         oracleRelayer.updateCollateralPrice("COL");
-//         uint batchId = cat.bite("COL", manager.cdps(cdp));
-//
-//         address(user1).transfer(10 ether);
-//         user1.doEthJoin(address(weth), address(ethJoin), address(user1), 10 ether);
-//         user1.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user1), address(user1), address(user1), 10 ether, 1000 ether);
-//
-//         address(user2).transfer(10 ether);
-//         user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
-//         user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
-//
-//         user1.doHope(address(cdpEngine), address(colFlip));
-//         user2.doHope(address(cdpEngine), address(colFlip));
-//
-//         user1.doTend(address(colFlip), batchId, 1 ether, rad(40 ether));
-//
-//         user2.doDent(address(colFlip), batchId, 0.7 ether, rad(40 ether));
-//         assertEq(cdpEngine.tokenCollateral("COL", manager.cdps(cdp)), 0.3 ether);
-//         assertEq(col.balanceOf(address(this)), 0);
-//         this.exitTokenCollateral(address(manager), address(colJoin), cdp, 0.3 ether);
-//         assertEq(cdpEngine.tokenCollateral("COL", manager.cdps(cdp)), 0);
-//         assertEq(col.balanceOf(address(this)), 0.3 ether);
-//     }
-//
-//     function testExitDGDAfterFlip() public {
-//         this.modifyParameters(address(cat), "DGD", "lump", 1 ether); // 1 unit of collateral per batch
-//         this.modifyParameters(address(cat), "DGD", "chop", ONE);
-//
-//         uint cdp = this.openCDP(address(manager), "DGD", address(proxy));
-//         dgd.approve(address(proxy), 1 * 10 ** 9);
-//         this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), cdp, 1 * 10 ** 9, 30 ether, true);
-//
-//         orclDGD.updateResult(bytes32(uint(40 * 10 ** 18))); // Force liquidation
-//         oracleRelayer.updateCollateralPrice("DGD");
-//         uint batchId = cat.bite("DGD", manager.cdps(cdp));
-//
-//         address(user1).transfer(10 ether);
-//         user1.doEthJoin(address(weth), address(ethJoin), address(user1), 10 ether);
-//         user1.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user1), address(user1), address(user1), 10 ether, 1000 ether);
-//
-//         address(user2).transfer(10 ether);
-//         user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
-//         user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
-//
-//         user1.doHope(address(cdpEngine), address(dgdCollateralAuctionHouse));
-//         user2.doHope(address(cdpEngine), address(dgdCollateralAuctionHouse));
-//
-//         user1.doTend(address(dgdCollateralAuctionHouse), batchId, 1 ether, rad(30 ether));
-//
-//         user2.doDent(address(dgdCollateralAuctionHouse), batchId, 0.7 ether, rad(30 ether));
-//         assertEq(cdpEngine.tokenCollateral("DGD", manager.cdps(cdp)), 0.3 ether);
-//         uint prevBalance = dgd.balanceOf(address(this));
-//         this.exitTokenCollateral(address(manager), address(dgdJoin), cdp, 0.3 * 10 ** 9);
-//         assertEq(cdpEngine.tokenCollateral("DGD", manager.cdps(cdp)), 0);
-//         assertEq(dgd.balanceOf(address(this)), prevBalance + 0.3 * 10 ** 9);
-//     }
-//
-//     function testLockBackAfterFlip() public {
-//         uint cdp = _collateralAuctionETH();
-//         (uint inkV,) = cdpEngine.cdps("ETH", manager.cdps(cdp));
-//         assertEq(inkV, 0);
-//         assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 0.3 ether);
-//         this.modifyCDPCollateralization(address(manager), cdp, 0.3 ether, 0);
-//         (inkV,) = cdpEngine.cdps("ETH", manager.cdps(cdp));
-//         assertEq(inkV, 0.3 ether);
-//         assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 0);
-//     }
-//
-//     function testEnd() public {
-//         this.modifyParameters(address(cat), "ETH", "lump", 1 ether); // 1 unit of collateral per batch
-//         this.modifyParameters(address(cat), "ETH", "chop", ONE);
-//
-//         uint cdp = this.openLockETHAndGenerateDebt.value(2 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), "ETH", 300 ether);
-//         col.mint(1 ether);
-//         col.approve(address(proxy), 1 ether);
-//         uint cdp2 = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), "COL", 1 ether, 5 ether, true);
-//         dgd.approve(address(proxy), 1 * 10 ** 9);
-//         uint cdp3 = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), "DGD", 1 * 10 ** 9, 5 ether, true);
-//
-//         this.cage(address(end));
-//         end.cage("ETH");
-//         end.cage("COL");
-//         end.cage("DGD");
-//
-//         (uint inkV, uint artV) = cdpEngine.cdps("ETH", manager.cdps(cdp));
-//         assertEq(inkV, 2 ether);
-//         assertEq(artV, 300 ether);
-//
-//         (inkV, artV) = cdpEngine.cdps("COL", manager.cdps(cdp2));
-//         assertEq(inkV, 1 ether);
-//         assertEq(artV, 5 ether);
-//
-//         (inkV, artV) = cdpEngine.cdps("DGD", manager.cdps(cdp3));
-//         assertEq(inkV, 1 ether);
-//         assertEq(artV, 5 ether);
-//
-//         uint prevBalanceETH = address(this).balance;
-//         this.globalSettlement_freeETH(address(manager), address(ethJoin), address(end), cdp);
-//         (inkV, artV) = cdpEngine.cdps("ETH", manager.cdps(cdp));
-//         assertEq(inkV, 0);
-//         assertEq(artV, 0);
-//         uint remainInkVal = 2 ether - 300 * end.tag("ETH") / 10 ** 9; // 2 ETH (deposited) - 300 COIN debt * ETH cage price
-//         assertEq(address(this).balance, prevBalanceETH + remainInkVal);
-//
-//         uint prevBalanceCol = col.balanceOf(address(this));
-//         this.globalSettlement_freeTokenCollateral(address(manager), address(colJoin), address(end), cdp2);
-//         (inkV, artV) = cdpEngine.cdps("COL", manager.cdps(cdp2));
-//         assertEq(inkV, 0);
-//         assertEq(artV, 0);
-//         remainInkVal = 1 ether - 5 * end.tag("COL") / 10 ** 9; // 1 COL (deposited) - 5 COIN debt * COL cage price
-//         assertEq(col.balanceOf(address(this)), prevBalanceCol + remainInkVal);
-//
-//         uint prevBalanceDGD = dgd.balanceOf(address(this));
-//         this.globalSettlement_freeTokenCollateral(address(manager), address(dgdJoin), address(end), cdp3);
-//         (inkV, artV) = cdpEngine.cdps("DGD", manager.cdps(cdp3));
-//         assertEq(inkV, 0);
-//         assertEq(artV, 0);
-//         remainInkVal = (1 ether - 5 * end.tag("DGD") / 10 ** 9) / 10 ** 9; // 1 DGD (deposited) - 5 COIN debt * DGD cage price
-//         assertEq(dgd.balanceOf(address(this)), prevBalanceDGD + remainInkVal);
-//
-//         end.thaw();
-//
-//         end.flow("ETH");
-//         end.flow("COL");
-//         end.flow("DGD");
-//
-//         coin.approve(address(proxy), 310 ether);
-//         this.globalSettlement_prepareCoinsForRedeeming(address(coinJoin), address(end), 310 ether);
-//
-//         this.globalSettlement_redeemETH(address(ethJoin), address(end), "ETH", 310 ether);
-//         this.globalSettlement_redeemTokenCollateral(address(colJoin), address(end), "COL", 310 ether);
-//         this.globalSettlement_redeemTokenCollateral(address(dgdJoin), address(end), "DGD", 310 ether);
-//
-//         assertEq(address(this).balance, prevBalanceETH + 2 ether - 1); // (-1 rounding)
-//         assertEq(col.balanceOf(address(this)), prevBalanceCol + 1 ether - 1); // (-1 rounding)
-//         assertEq(dgd.balanceOf(address(this)), prevBalanceDGD + 1 * 10 ** 9 - 1); // (-1 rounding)
-//     }
-//
-//     function testDSRSimpleCase() public {
-//         this.modifyParameters(address(coinSavingsAccount), "dsr", uint(1.05 * 10 ** 27)); // 5% per second
-//         uint initialTime = 0; // Initial time set to 0 to avoid any intial rounding
-//         hevm.warp(initialTime);
-//         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-//         this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
-//         coin.approve(address(proxy), 50 ether);
-//         assertEq(coin.balanceOf(address(this)), 50 ether);
-//         assertEq(coinSavingsAccount.pie(address(this)), 0 ether);
-//         this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
-//         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
-//         assertEq(coin.balanceOf(address(this)), 0 ether);
-//         assertEq(coinSavingsAccount.pie(address(proxy)) * coinSavingsAccount.chi(), 50 ether * ONE);
-//         hevm.warp(initialTime + 1); // Moved 1 second
-//         coinSavingsAccount.updateAccumulatedRate();
-//         assertEq(coinSavingsAccount.pie(address(proxy)) * coinSavingsAccount.chi(), 52.5 ether * ONE); // Now the equivalent COIN amount is 2.5 COIN extra
-//         this.coinSavingsAccount_withdraw(address(coinJoin), address(coinSavingsAccount), 52.5 ether);
-//         assertEq(coin.balanceOf(address(this)), 52.5 ether);
-//         assertEq(coinSavingsAccount.pie(address(proxy)), 0);
-//     }
-//
-//     function testDSRRounding() public {
-//         this.modifyParameters(address(coinSavingsAccount), "dsr", uint(1.05 * 10 ** 27));
-//         uint initialTime = 1; // Initial time set to 1 this way some the pie will not be the same than the initial COIN wad amount
-//         hevm.warp(initialTime);
-//         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-//         this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
-//         coin.approve(address(proxy), 50 ether);
-//         assertEq(coin.balanceOf(address(this)), 50 ether);
-//         assertEq(coinSavingsAccount.pie(address(this)), 0 ether);
-//         this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
-//         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
-//         assertEq(coin.balanceOf(address(this)), 0 ether);
-//         // Due rounding the COIN equivalent is not the same than initial wad amount
-//         assertEq(coinSavingsAccount.pie(address(proxy)) * coinSavingsAccount.chi(), 49999999999999999999350000000000000000000000000);
-//         hevm.warp(initialTime + 1);
-//         coinSavingsAccount.updateAccumulatedRate(); // Just necessary to check in this test the updated value of chi
-//         assertEq(coinSavingsAccount.pie(address(proxy)) * coinSavingsAccount.chi(), 52499999999999999999317500000000000000000000000);
-//         this.coinSavingsAccount_withdraw(address(coinJoin), address(coinSavingsAccount), 52.5 ether);
-//         assertEq(coin.balanceOf(address(this)), 52499999999999999999);
-//         assertEq(coinSavingsAccount.pie(address(proxy)), 0);
-//     }
-//
-//     function testDSRRounding2() public {
-//         this.modifyParameters(address(coinSavingsAccount), "dsr", uint(1.03434234324 * 10 ** 27));
-//         uint initialTime = 1;
-//         hevm.warp(initialTime);
-//         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-//         this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
-//         coin.approve(address(proxy), 50 ether);
-//         assertEq(coin.balanceOf(address(this)), 50 ether);
-//         assertEq(coinSavingsAccount.pie(address(this)), 0 ether);
-//         this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
-//         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
-//         assertEq(coinSavingsAccount.pie(address(proxy)) * coinSavingsAccount.chi(), 49999999999999999999993075745400000000000000000);
-//         assertEq(cdpEngine.coinBalance(address(proxy)), mul(50 ether, ONE) - 49999999999999999999993075745400000000000000000);
-//         this.coinSavingsAccount_withdraw(address(coinJoin), address(coinSavingsAccount), 50 ether);
-//         // In this case we get the full 50 COIN back as we also use (for the exit) the dust that remained in the proxy COIN balance in the cdpEngine
-//         // The proxy function tries to return the wad amount if there is enough balance to do it
-//         assertEq(coin.balanceOf(address(this)), 50 ether);
-//     }
-//
-//     function testDSRExitAll() public {
-//         this.modifyParameters(address(coinSavingsAccount), "dsr", uint(1.03434234324 * 10 ** 27));
-//         uint initialTime = 1;
-//         hevm.warp(initialTime);
-//         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-//         this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
-//         this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exitAll
-//         coin.approve(address(proxy), 50 ether);
-//         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
-//         this.coinSavingsAccount_exitAll(address(coinJoin), address(coinSavingsAccount));
-//         // In this case we get 49.999 COIN back as the returned amount is based purely in the pie amount
-//         assertEq(coin.balanceOf(address(this)), 49999999999999999999);
-//     }
+    function testExitTokenCollateralAfterAuction() public {
+        this.modifyParameters(address(liquidationEngine), "COL", "collateralToSell", 1 ether); // 1 unit of collateral per batch
+        this.modifyParameters(address(liquidationEngine), "COL", "liquidationPenalty", ONE);
+
+        col.mint(1 ether);
+        uint cdp = this.openCDP(address(manager), "COL", address(proxy));
+        col.approve(address(proxy), 1 ether);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), cdp, 1 ether, 40 ether, true);
+
+        orclCOL.updateResult(bytes32(uint(40 * 10 ** 18))); // Force liquidation
+        oracleRelayer.updateCollateralPrice("COL");
+        uint batchId = liquidationEngine.liquidateCDP("COL", manager.cdps(cdp));
+
+        address(user1).transfer(10 ether);
+        user1.doEthJoin(address(weth), address(ethJoin), address(user1), 10 ether);
+        user1.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user1), address(user1), address(user1), 10 ether, 1000 ether);
+
+        address(user2).transfer(10 ether);
+        user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
+        user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
+
+        user1.doCDPApprove(address(cdpEngine), address(colAuctionHouse));
+        user2.doCDPApprove(address(cdpEngine), address(colAuctionHouse));
+
+        user1.doIncreaseBidSize(address(colAuctionHouse), batchId, 1 ether, rad(40 ether));
+
+        user2.doDecreaseSoldAmount(address(colAuctionHouse), batchId, 0.7 ether, rad(40 ether));
+        assertEq(cdpEngine.tokenCollateral("COL", manager.cdps(cdp)), 0.3 ether);
+        assertEq(col.balanceOf(address(this)), 0);
+        this.exitTokenCollateral(address(manager), address(colJoin), cdp, 0.3 ether);
+        assertEq(cdpEngine.tokenCollateral("COL", manager.cdps(cdp)), 0);
+        assertEq(col.balanceOf(address(this)), 0.3 ether);
+    }
+
+    function testExitDGDAfterAuction() public {
+        this.modifyParameters(address(liquidationEngine), "DGD", "collateralToSell", 1 ether); // 1 unit of collateral per batch
+        this.modifyParameters(address(liquidationEngine), "DGD", "liquidationPenalty", ONE);
+
+        uint cdp = this.openCDP(address(manager), "DGD", address(proxy));
+        dgd.approve(address(proxy), 1 * 10 ** 9);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), cdp, 1 * 10 ** 9, 30 ether, true);
+
+        orclDGD.updateResult(bytes32(uint(40 * 10 ** 18))); // Force liquidation
+        oracleRelayer.updateCollateralPrice("DGD");
+        uint batchId = liquidationEngine.liquidateCDP("DGD", manager.cdps(cdp));
+
+        address(user1).transfer(10 ether);
+        user1.doEthJoin(address(weth), address(ethJoin), address(user1), 10 ether);
+        user1.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user1), address(user1), address(user1), 10 ether, 1000 ether);
+
+        address(user2).transfer(10 ether);
+        user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
+        user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
+
+        user1.doCDPApprove(address(cdpEngine), address(dgdCollateralAuctionHouse));
+        user2.doCDPApprove(address(cdpEngine), address(dgdCollateralAuctionHouse));
+
+        user1.doIncreaseBidSize(address(dgdCollateralAuctionHouse), batchId, 1 ether, rad(30 ether));
+
+        user2.doDecreaseSoldAmount(address(dgdCollateralAuctionHouse), batchId, 0.7 ether, rad(30 ether));
+        assertEq(cdpEngine.tokenCollateral("DGD", manager.cdps(cdp)), 0.3 ether);
+        uint prevBalance = dgd.balanceOf(address(this));
+        this.exitTokenCollateral(address(manager), address(dgdJoin), cdp, 0.3 * 10 ** 9);
+        assertEq(cdpEngine.tokenCollateral("DGD", manager.cdps(cdp)), 0);
+        assertEq(dgd.balanceOf(address(this)), prevBalance + 0.3 * 10 ** 9);
+    }
+
+    function testLockBackAfterCollateralAuction() public {
+        uint cdp = _collateralAuctionETH();
+        (uint lockedCollateral,) = cdpEngine.cdps("ETH", manager.cdps(cdp));
+        assertEq(lockedCollateral, 0);
+        assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 0.3 ether);
+        this.modifyCDPCollateralization(address(manager), cdp, 0.3 ether, 0);
+        (lockedCollateral,) = cdpEngine.cdps("ETH", manager.cdps(cdp));
+        assertEq(lockedCollateral, 0.3 ether);
+        assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 0);
+    }
+
+    function testGlobalSettlement() public {
+        this.modifyParameters(address(liquidationEngine), "ETH", "collateralToSell", 1 ether); // 1 unit of collateral per batch
+        this.modifyParameters(address(liquidationEngine), "ETH", "liquidationPenalty", ONE);
+
+        uint cdp = this.openLockETHAndGenerateDebt.value(2 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), "ETH", 300 ether);
+        col.mint(1 ether);
+        col.approve(address(proxy), 1 ether);
+        uint cdp2 = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), "COL", 1 ether, 5 ether, true);
+        dgd.approve(address(proxy), 1 * 10 ** 9);
+        uint cdp3 = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), "DGD", 1 * 10 ** 9, 5 ether, true);
+
+        this.shutdownSystem(address(globalSettlement));
+        globalSettlement.freezeCollateralType("ETH");
+        globalSettlement.freezeCollateralType("COL");
+        globalSettlement.freezeCollateralType("DGD");
+
+        (uint lockedCollateral, uint generatedDebt) = cdpEngine.cdps("ETH", manager.cdps(cdp));
+        assertEq(lockedCollateral, 2 ether);
+        assertEq(generatedDebt, 300 ether);
+
+        (lockedCollateral, generatedDebt) = cdpEngine.cdps("COL", manager.cdps(cdp2));
+        assertEq(lockedCollateral, 1 ether);
+        assertEq(generatedDebt, 5 ether);
+
+        (lockedCollateral, generatedDebt) = cdpEngine.cdps("DGD", manager.cdps(cdp3));
+        assertEq(lockedCollateral, 1 ether);
+        assertEq(generatedDebt, 5 ether);
+
+        uint prevBalanceETH = address(this).balance;
+        this.globalSettlement_freeETH(address(manager), address(ethJoin), address(globalSettlement), cdp);
+        (lockedCollateral, generatedDebt) = cdpEngine.cdps("ETH", manager.cdps(cdp));
+        assertEq(lockedCollateral, 0);
+        assertEq(generatedDebt, 0);
+        uint remainingCollateralValue = 2 ether - 300 * globalSettlement.finalCoinPerCollateralPrice("ETH") / 10 ** 9; // 2 ETH (deposited) - 300 COIN debt * ETH cage price
+        assertEq(address(this).balance, prevBalanceETH + remainingCollateralValue);
+
+        uint prevBalanceCol = col.balanceOf(address(this));
+        this.globalSettlement_freeTokenCollateral(address(manager), address(colJoin), address(globalSettlement), cdp2);
+        (lockedCollateral, generatedDebt) = cdpEngine.cdps("COL", manager.cdps(cdp2));
+        assertEq(lockedCollateral, 0);
+        assertEq(generatedDebt, 0);
+        remainingCollateralValue = 1 ether - 5 * globalSettlement.finalCoinPerCollateralPrice("COL") / 10 ** 9; // 1 COL (deposited) - 5 COIN debt * COL cage price
+        assertEq(col.balanceOf(address(this)), prevBalanceCol + remainingCollateralValue);
+
+        uint prevBalanceDGD = dgd.balanceOf(address(this));
+        this.globalSettlement_freeTokenCollateral(address(manager), address(dgdJoin), address(globalSettlement), cdp3);
+        (lockedCollateral, generatedDebt) = cdpEngine.cdps("DGD", manager.cdps(cdp3));
+        assertEq(lockedCollateral, 0);
+        assertEq(generatedDebt, 0);
+        remainingCollateralValue = (1 ether - 5 * globalSettlement.finalCoinPerCollateralPrice("DGD") / 10 ** 9) / 10 ** 9; // 1 DGD (deposited) - 5 COIN debt * DGD cage price
+        assertEq(dgd.balanceOf(address(this)), prevBalanceDGD + remainingCollateralValue);
+
+        globalSettlement.setOutstandingCoinSupply();
+
+        globalSettlement.calculateCashPrice("ETH");
+        globalSettlement.calculateCashPrice("COL");
+        globalSettlement.calculateCashPrice("DGD");
+
+        coin.approve(address(proxy), 310 ether);
+        this.globalSettlement_prepareCoinsForRedeeming(address(coinJoin), address(globalSettlement), 310 ether);
+
+        this.globalSettlement_redeemETH(address(ethJoin), address(globalSettlement), "ETH", 310 ether);
+        this.globalSettlement_redeemTokenCollateral(address(colJoin), address(globalSettlement), "COL", 310 ether);
+        this.globalSettlement_redeemTokenCollateral(address(dgdJoin), address(globalSettlement), "DGD", 310 ether);
+
+        assertEq(address(this).balance, prevBalanceETH + 2 ether - 1); // (-1 rounding)
+        assertEq(col.balanceOf(address(this)), prevBalanceCol + 1 ether - 1); // (-1 rounding)
+        assertEq(dgd.balanceOf(address(this)), prevBalanceDGD + 1 * 10 ** 9 - 1); // (-1 rounding)
+    }
+
+    function testCoinSavingsAccountSimpleCase() public {
+        this.modifyParameters(address(coinSavingsAccount), "savingsRate", uint(1.05 * 10 ** 27)); // 5% per second
+        uint initialTime = 0; // Initial time set to 0 to avoid any intial rounding
+        hevm.warp(initialTime);
+        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        coin.approve(address(proxy), 50 ether);
+        assertEq(coin.balanceOf(address(this)), 50 ether);
+        assertEq(coinSavingsAccount.savings(address(this)), 0 ether);
+        this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
+        this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
+        assertEq(coin.balanceOf(address(this)), 0 ether);
+        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRates(), 50 ether * ONE);
+        hevm.warp(initialTime + 1); // Moved 1 second
+        coinSavingsAccount.updateAccumulatedRate();
+        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRates(), 52.5 ether * ONE); // Now the equivalent COIN amount is 2.5 COIN extra
+        this.coinSavingsAccount_withdraw(address(coinJoin), address(coinSavingsAccount), 52.5 ether);
+        assertEq(coin.balanceOf(address(this)), 52.5 ether);
+        assertEq(coinSavingsAccount.savings(address(proxy)), 0);
+    }
+
+    function testCoinSavingsAccountRounding() public {
+        this.modifyParameters(address(coinSavingsAccount), "savingsRate", uint(1.05 * 10 ** 27));
+        uint initialTime = 1; // Initial time set to 1 this way some the pie will not be the same than the initial COIN wad amount
+        hevm.warp(initialTime);
+        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        coin.approve(address(proxy), 50 ether);
+        assertEq(coin.balanceOf(address(this)), 50 ether);
+        assertEq(coinSavingsAccount.savings(address(this)), 0 ether);
+        this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
+        this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
+        assertEq(coin.balanceOf(address(this)), 0 ether);
+        // Due rounding the COIN equivalent is not the same than initial wad amount
+        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRates(), 49999999999999999999350000000000000000000000000);
+        hevm.warp(initialTime + 1);
+        coinSavingsAccount.updateAccumulatedRate(); // Just necessary to check in this test the updated value of chi
+        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRates(), 52499999999999999999317500000000000000000000000);
+        this.coinSavingsAccount_withdraw(address(coinJoin), address(coinSavingsAccount), 52.5 ether);
+        assertEq(coin.balanceOf(address(this)), 52499999999999999999);
+        assertEq(coinSavingsAccount.savings(address(proxy)), 0);
+    }
+
+    function testCoinSavingsAccountRounding2() public {
+        this.modifyParameters(address(coinSavingsAccount), "savingsRate", uint(1.03434234324 * 10 ** 27));
+        uint initialTime = 1;
+        hevm.warp(initialTime);
+        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        coin.approve(address(proxy), 50 ether);
+        assertEq(coin.balanceOf(address(this)), 50 ether);
+        assertEq(coinSavingsAccount.savings(address(this)), 0 ether);
+        this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
+        this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
+        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRates(), 49999999999999999999993075745400000000000000000);
+        assertEq(cdpEngine.coinBalance(address(proxy)), mul(50 ether, ONE) - 49999999999999999999993075745400000000000000000);
+        this.coinSavingsAccount_withdraw(address(coinJoin), address(coinSavingsAccount), 50 ether);
+        // In this case we get the full 50 COIN back as we also use (for the exit) the dust that remained in the proxy COIN balance in the cdpEngine
+        // The proxy function tries to return the wad amount if there is enough balance to do it
+        assertEq(coin.balanceOf(address(this)), 50 ether);
+    }
+
+    function testCoinSavingsAccountWithdrawAll() public {
+        this.modifyParameters(address(coinSavingsAccount), "savingsRate", uint(1.03434234324 * 10 ** 27));
+        uint initialTime = 1;
+        hevm.warp(initialTime);
+        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exitAll
+        coin.approve(address(proxy), 50 ether);
+        this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
+        this.coinSavingsAccount_withdrawAll(address(coinJoin), address(coinSavingsAccount));
+        // In this case we get 49.999 COIN back as the returned amount is based purely in the pie amount
+        assertEq(coin.balanceOf(address(this)), 49999999999999999999);
+    }
 }
