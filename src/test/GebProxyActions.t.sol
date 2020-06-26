@@ -1,4 +1,4 @@
-pragma solidity ^0.5.15;
+pragma solidity ^0.6.7;
 
 import "ds-test/test.sol";
 
@@ -82,12 +82,12 @@ contract ProxyCalls {
     }
 
     function lockETH(address, address, uint) public payable {
-        (bool success,) = address(proxy).call.value(msg.value)(abi.encodeWithSignature("execute(address,bytes)", gebProxyActions, msg.data));
+        (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyActions, msg.data));
         require(success, "");
     }
 
     function safeLockETH(address, address, uint, address) public payable {
-        (bool success,) = address(proxy).call.value(msg.value)(abi.encodeWithSignature("execute(address,bytes)", gebProxyActions, msg.data));
+        (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyActions, msg.data));
         require(success, "");
     }
 
@@ -103,8 +103,8 @@ contract ProxyCalls {
         address payable target = address(proxy);
         bytes memory data = abi.encodeWithSignature("execute(address,bytes)", gebProxyActions, msg.data);
         assembly {
-            let succeeded := call(sub(gas, 5000), target, callvalue, add(data, 0x20), mload(data), 0, 0)
-            let size := returndatasize
+            let succeeded := call(sub(gas(), 5000), target, callvalue(), add(data, 0x20), mload(data), 0, 0)
+            let size := returndatasize()
             let response := mload(0x40)
             mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
             mstore(response, size)
@@ -157,7 +157,7 @@ contract ProxyCalls {
     }
 
     function lockETHAndGenerateDebt(address, address, address, address, uint, uint) public payable {
-        (bool success,) = address(proxy).call.value(msg.value)(abi.encodeWithSignature("execute(address,bytes)", gebProxyActions, msg.data));
+        (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyActions, msg.data));
         require(success, "");
     }
 
@@ -165,8 +165,8 @@ contract ProxyCalls {
         address payable target = address(proxy);
         bytes memory data = abi.encodeWithSignature("execute(address,bytes)", gebProxyActions, msg.data);
         assembly {
-            let succeeded := call(sub(gas, 5000), target, callvalue, add(data, 0x20), mload(data), 0, 0)
-            let size := returndatasize
+            let succeeded := call(sub(gas(), 5000), target, callvalue(), add(data, 0x20), mload(data), 0, 0)
+            let size := returndatasize()
             let response := mload(0x40)
             mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
             mstore(response, size)
@@ -272,7 +272,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     DSValue orclGNT;
     ProxyRegistry registry;
 
-    function setUp() public {
+    function setUp() override public {
         super.setUp();
         deployStableKeepAuth();
 
@@ -385,7 +385,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
 
         assertEq(coin.balanceOf(address(this)), 0);
-        weth.deposit.value(1 ether)();
+        weth.deposit{value: 1 ether}();
         weth.approve(address(ethJoin), uint(-1));
         ethJoin.join(manager.cdps(cdp), 1 ether);
         assertEq(cdpEngine.tokenCollateral("ETH", address(this)), 0);
@@ -401,7 +401,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
 
         assertEq(coin.balanceOf(address(this)), 0);
-        weth.deposit.value(1 ether)();
+        weth.deposit{value: 1 ether}();
         weth.approve(address(ethJoin), uint(-1));
         ethJoin.join(manager.cdps(cdp), 1 ether);
 
@@ -423,7 +423,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint initialBalance = address(this).balance;
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0);
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 2 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
     }
@@ -432,7 +432,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint initialBalance = address(this).balance;
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0);
-        this.safeLockETH.value(2 ether)(address(manager), address(ethJoin), cdp, address(proxy));
+        this.safeLockETH{value: 2 ether}(address(manager), address(ethJoin), cdp, address(proxy));
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 2 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
     }
@@ -442,7 +442,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         this.transferCDPOwnership(address(manager), cdp, address(123));
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0);
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 2 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
     }
@@ -450,7 +450,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     function testFailSafeLockETHOtherCDPOwner() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         this.transferCDPOwnership(address(manager), cdp, address(123));
-        this.safeLockETH.value(2 ether)(address(manager), address(ethJoin), cdp, address(321));
+        this.safeLockETH{value: 2 ether}(address(manager), address(ethJoin), cdp, address(321));
     }
 
     function testLockTokenCollateral() public {
@@ -519,7 +519,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     function testFreeETH() public {
         uint initialBalance = address(this).balance;
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         this.freeETH(address(manager), address(ethJoin), cdp, 1 ether);
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 1 ether);
         assertEq(address(this).balance, initialBalance - 1 ether);
@@ -560,7 +560,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testGenerateDebt() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         assertEq(coin.balanceOf(address(this)), 0);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         assertEq(coin.balanceOf(address(this)), 300 ether);
@@ -572,7 +572,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         hevm.warp(now + 1);
         taxCollector.taxSingle("ETH"); // This is actually not necessary as `generateDebt` will also call taxSingle
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         assertEq(coin.balanceOf(address(this)), 0);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         assertEq(coin.balanceOf(address(this)), 300 ether);
@@ -581,7 +581,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testRepayDebt() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 100 ether);
         this.repayDebt(address(manager), address(coinJoin), cdp, 100 ether);
@@ -591,7 +591,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testRepayDebtAll() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 300 ether);
         this.repayAllDebt(address(manager), address(coinJoin), cdp);
@@ -601,7 +601,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testSafeRepayDebt() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 100 ether);
         this.safeRepayDebt(address(manager), address(coinJoin), cdp, 100 ether, address(proxy));
@@ -611,7 +611,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testSafeRepayAllDebt() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 300 ether);
         this.safeRepayAllDebt(address(manager), address(coinJoin), cdp, address(proxy));
@@ -621,7 +621,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testRepayDebtOtherCDPOwner() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 100 ether);
         this.transferCDPOwnership(address(manager), cdp, address(123));
@@ -632,7 +632,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testFailSafeRepayDebtOtherCDPOwner() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 100 ether);
         this.transferCDPOwnership(address(manager), cdp, address(123));
@@ -641,7 +641,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testFailSafeRepayDebtAllOtherCDPOwner() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 300 ether);
         this.transferCDPOwnership(address(manager), cdp, address(123));
@@ -653,7 +653,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         hevm.warp(now + 1);
         taxCollector.taxSingle("ETH");
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 100 ether);
         this.repayDebt(address(manager), address(coinJoin), cdp, 100 ether);
@@ -667,7 +667,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         hevm.warp(now + 1);
         taxCollector.taxSingle("ETH");
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH.value(2 ether)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 300 ether);
         this.repayDebt(address(manager), address(coinJoin), cdp, 300 ether);
@@ -681,7 +681,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         taxCollector.taxSingle("ETH"); // This is actually not necessary as `draw` will also call taxSingle
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         uint times = 30;
-        this.lockETH.value(2 ether * times)(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether * times}(address(manager), address(ethJoin), cdp);
         for (uint i = 0; i < times; i++) {
             this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
         }
@@ -695,7 +695,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint initialBalance = address(this).balance;
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0);
         assertEq(coin.balanceOf(address(this)), 0);
-        this.lockETHAndGenerateDebt.value(2 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
+        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 300 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
@@ -704,7 +704,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     function testOpenLockETHAndGenerateDebt() public {
         uint initialBalance = address(this).balance;
         assertEq(coin.balanceOf(address(this)), 0);
-        uint cdp = this.openLockETHAndGenerateDebt.value(2 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), "ETH", 300 ether);
+        uint cdp = this.openLockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), "ETH", 300 ether);
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 300 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
@@ -789,7 +789,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     function testRepayDebtAndFreeETH() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         uint initialBalance = address(this).balance;
-        this.lockETHAndGenerateDebt.value(2 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
+        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 250 ether);
         this.repayDebtAndFreeETH(address(manager), address(ethJoin), address(coinJoin), cdp, 1.5 ether, 250 ether);
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0.5 ether);
@@ -801,7 +801,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     function testRepayAllDebtAndFreeETH() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         uint initialBalance = address(this).balance;
-        this.lockETHAndGenerateDebt.value(2 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
+        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
         coin.approve(address(proxy), 300 ether);
         this.repayAllDebtAndFreeETH(address(manager), address(ethJoin), address(coinJoin), cdp, 1.5 ether);
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0.5 ether);
@@ -851,9 +851,9 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testPreventHigherCoinOnRepayDebt() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt.value(2 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
+        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
 
-        weth.deposit.value(2 ether)();
+        weth.deposit{value: 2 ether}();
         weth.approve(address(ethJoin), 2 ether);
         ethJoin.join(address(this), 2 ether);
         cdpEngine.modifyCDPCollateralization("ETH", address(this), address(this), address(this), 1 ether, 150 ether);
@@ -873,7 +873,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testQuitSystem() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
 
         assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 1 ether);
         assertEq(generatedDebt("ETH", manager.cdps(cdp)), 50 ether);
@@ -890,7 +890,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     }
 
     function testEnterSystem() public {
-        weth.deposit.value(1 ether)();
+        weth.deposit{value: 1 ether}();
         weth.approve(address(ethJoin), 1 ether);
         ethJoin.join(address(this), 1 ether);
         cdpEngine.modifyCDPCollateralization("ETH", address(this), address(this), address(this), 1 ether, 50 ether);
@@ -913,7 +913,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testMoveCDP() public {
         uint cdpSrc = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdpSrc, 50 ether);
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdpSrc, 50 ether);
 
         uint cdpDst = this.openCDP(address(manager), "ETH", address(proxy));
 
@@ -935,7 +935,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.modifyParameters(address(liquidationEngine), "ETH", "liquidationPenalty", ONE);
 
         cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 200 ether); // Maximun COIN generated
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 200 ether); // Maximun COIN generated
         orclETH.updateResult(bytes32(uint(300 * 10 ** 18 - 1))); // Force liquidation
         oracleRelayer.updateCollateralPrice("ETH");
         uint batchId = liquidationEngine.liquidateCDP("ETH", manager.cdps(cdp));
@@ -1046,7 +1046,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.modifyParameters(address(liquidationEngine), "ETH", "collateralToSell", 1 ether); // 1 unit of collateral per batch
         this.modifyParameters(address(liquidationEngine), "ETH", "liquidationPenalty", ONE);
 
-        uint cdp = this.openLockETHAndGenerateDebt.value(2 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), "ETH", 300 ether);
+        uint cdp = this.openLockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), "ETH", 300 ether);
         col.mint(1 ether);
         col.approve(address(proxy), 1 ether);
         uint cdp2 = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), "COL", 1 ether, 5 ether, true);
@@ -1117,7 +1117,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint initialTime = 0; // Initial time set to 0 to avoid any intial rounding
         hevm.warp(initialTime);
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
         coin.approve(address(proxy), 50 ether);
         assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(coinSavingsAccount.savings(address(this)), 0 ether);
@@ -1138,7 +1138,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint initialTime = 1; // Initial time set to 1 this way some the pie will not be the same than the initial COIN wad amount
         hevm.warp(initialTime);
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
         coin.approve(address(proxy), 50 ether);
         assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(coinSavingsAccount.savings(address(this)), 0 ether);
@@ -1160,7 +1160,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint initialTime = 1;
         hevm.warp(initialTime);
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
         coin.approve(address(proxy), 50 ether);
         assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(coinSavingsAccount.savings(address(this)), 0 ether);
@@ -1179,7 +1179,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint initialTime = 1;
         hevm.warp(initialTime);
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt.value(1 ether)(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
         this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exitAll
         coin.approve(address(proxy), 50 ether);
         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);

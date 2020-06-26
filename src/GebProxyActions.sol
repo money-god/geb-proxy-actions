@@ -15,100 +15,100 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-pragma solidity ^0.5.15;
+pragma solidity ^0.6.7;
 
-contract CollateralLike {
-    function approve(address, uint) public;
-    function transfer(address, uint) public;
-    function transferFrom(address, address, uint) public;
-    function deposit() public payable;
-    function withdraw(uint) public;
+abstract contract CollateralLike {
+    function approve(address, uint) virtual public;
+    function transfer(address, uint) virtual public;
+    function transferFrom(address, address, uint) virtual public;
+    function deposit() virtual public payable;
+    function withdraw(uint) virtual public;
 }
 
-contract ManagerLike {
-    function cdpCan(address, uint, address) public view returns (uint);
-    function collateralTypes(uint) public view returns (bytes32);
-    function ownsCDP(uint) public view returns (address);
-    function cdps(uint) public view returns (address);
-    function cdpEngine() public view returns (address);
-    function openCDP(bytes32, address) public returns (uint);
-    function transferCDPOwnership(uint, address) public;
-    function allowCDP(uint, address, uint) public;
-    function allowHandler(address, uint) public;
-    function modifyCDPCollateralization(uint, int, int) public;
-    function transferCollateral(uint, address, uint) public;
-    function transferInternalCoins(uint, address, uint) public;
-    function quitSystem(uint, address) public;
-    function enterSystem(address, uint) public;
-    function moveCDP(uint, uint) public;
+abstract contract ManagerLike {
+    function cdpCan(address, uint, address) virtual public view returns (uint);
+    function collateralTypes(uint) virtual public view returns (bytes32);
+    function ownsCDP(uint) virtual public view returns (address);
+    function cdps(uint) virtual public view returns (address);
+    function cdpEngine() virtual public view returns (address);
+    function openCDP(bytes32, address) virtual public returns (uint);
+    function transferCDPOwnership(uint, address) virtual public;
+    function allowCDP(uint, address, uint) virtual public;
+    function allowHandler(address, uint) virtual public;
+    function modifyCDPCollateralization(uint, int, int) virtual public;
+    function transferCollateral(uint, address, uint) virtual public;
+    function transferInternalCoins(uint, address, uint) virtual public;
+    function quitSystem(uint, address) virtual public;
+    function enterSystem(address, uint) virtual public;
+    function moveCDP(uint, uint) virtual public;
 }
 
-contract CDPEngineLike {
-    function canModifyCDP(address, address) public view returns (uint);
-    function collateralTypes(bytes32) public view returns (uint, uint, uint, uint, uint);
-    function coinBalance(address) public view returns (uint);
-    function cdps(bytes32, address) public view returns (uint, uint);
-    function modifyCDPCollateralization(bytes32, address, address, address, int, int) public;
-    function approveCDPModification(address) public;
-    function transferInternalCoins(address, address, uint) public;
+abstract contract CDPEngineLike {
+    function canModifyCDP(address, address) virtual public view returns (uint);
+    function collateralTypes(bytes32) virtual public view returns (uint, uint, uint, uint, uint);
+    function coinBalance(address) virtual public view returns (uint);
+    function cdps(bytes32, address) virtual public view returns (uint, uint);
+    function modifyCDPCollateralization(bytes32, address, address, address, int, int) virtual public;
+    function approveCDPModification(address) virtual public;
+    function transferInternalCoins(address, address, uint) virtual public;
 }
 
-contract CollateralJoinLike {
-    function decimals() public returns (uint);
-    function collateral() public returns (CollateralLike);
-    function join(address, uint) public payable;
-    function exit(address, uint) public;
+abstract contract CollateralJoinLike {
+    function decimals() virtual public returns (uint);
+    function collateral() virtual public returns (CollateralLike);
+    function join(address, uint) virtual public payable;
+    function exit(address, uint) virtual public;
 }
 
-contract GNTJoinLike {
-    function bags(address) public view returns (address);
-    function make(address) public returns (address);
+abstract contract GNTJoinLike {
+    function bags(address) virtual public view returns (address);
+    function make(address) virtual public returns (address);
 }
 
-contract DSTokenLike {
-    function approve(address, uint) public;
-    function transfer(address, uint) public;
-    function transferFrom(address, address, uint) public;
+abstract contract DSTokenLike {
+    function approve(address, uint) virtual public;
+    function transfer(address, uint) virtual public;
+    function transferFrom(address, address, uint) virtual public;
 }
 
-contract CoinJoinLike {
-    function cdpEngine() public returns (CDPEngineLike);
-    function systemCoin() public returns (DSTokenLike);
-    function join(address, uint) public payable;
-    function exit(address, uint) public;
+abstract contract CoinJoinLike {
+    function cdpEngine() virtual public returns (CDPEngineLike);
+    function systemCoin() virtual public returns (DSTokenLike);
+    function join(address, uint) virtual public payable;
+    function exit(address, uint) virtual public;
 }
 
-contract ApproveCDPModificationLike {
-    function approveCDPModification(address) public;
-    function denyCDPModification(address) public;
+abstract contract ApproveCDPModificationLike {
+    function approveCDPModification(address) virtual public;
+    function denyCDPModification(address) virtual public;
 }
 
-contract GlobalSettlementLike {
-    function collateralCashPrice(bytes32) public view returns (uint);
-    function redeemCollateral(bytes32, uint) public;
-    function freeCollateral(bytes32) public;
-    function prepareCoinsForRedeeming(uint) public;
-    function processCDP(bytes32, address) public;
+abstract contract GlobalSettlementLike {
+    function collateralCashPrice(bytes32) virtual public view returns (uint);
+    function redeemCollateral(bytes32, uint) virtual public;
+    function freeCollateral(bytes32) virtual public;
+    function prepareCoinsForRedeeming(uint) virtual public;
+    function processCDP(bytes32, address) virtual public;
 }
 
-contract TaxCollectorLike {
-    function taxSingle(bytes32) public returns (uint);
+abstract contract TaxCollectorLike {
+    function taxSingle(bytes32) virtual public returns (uint);
 }
 
-contract CoinSavingsAccountLike {
-    function savings(address) public view returns (uint);
-    function updateAccumulatedRate() public returns (uint);
-    function deposit(uint) public;
-    function withdraw(uint) public;
+abstract contract CoinSavingsAccountLike {
+    function savings(address) virtual public view returns (uint);
+    function updateAccumulatedRate() virtual public returns (uint);
+    function deposit(uint) virtual public;
+    function withdraw(uint) virtual public;
 }
 
-contract ProxyRegistryLike {
-    function proxies(address) public view returns (address);
-    function build(address) public returns (address);
+abstract contract ProxyRegistryLike {
+    function proxies(address) virtual public view returns (address);
+    function build(address) virtual public returns (address);
 }
 
-contract ProxyLike {
-    function owner() public view returns (address);
+abstract contract ProxyLike {
+    function owner() virtual public view returns (address);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -226,7 +226,7 @@ contract GebProxyActions is Common {
 
     function ethJoin_join(address apt, address cdp) public payable {
         // Wraps ETH in WETH
-        CollateralJoinLike(apt).collateral().deposit.value(msg.value)();
+        CollateralJoinLike(apt).collateral().deposit{value: msg.value}();
         // Approves adapter to take the WETH amount
         CollateralJoinLike(apt).collateral().approve(address(apt), msg.value);
         // Joins WETH collateral into the cdpEngine
