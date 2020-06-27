@@ -3,7 +3,7 @@ pragma solidity ^0.6.7;
 import 'ds-proxy/proxy.sol';
 
 // This Registry deploys new proxy instances through DSProxyFactory.build(address) and keeps a registry of owner => proxy
-contract ProxyRegistry {
+contract GebProxyRegistry {
     mapping(address => DSProxy) public proxies;
     DSProxyFactory factory;
 
