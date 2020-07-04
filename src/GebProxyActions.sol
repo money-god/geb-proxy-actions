@@ -125,13 +125,13 @@ contract Common {
     }
 
     // Public functions
-    function coinJoin_join(address apt, address urn, uint wad) public {
+    function coinJoin_join(address apt, address cdpHandler, uint wad) public {
         // Gets COIN from the user's wallet
         CoinJoinLike(apt).systemCoin().transferFrom(msg.sender, address(this), wad);
         // Approves adapter to take the COIN amount
         CoinJoinLike(apt).systemCoin().approve(apt, wad);
         // Joins COIN into the cdpEngine
-        CoinJoinLike(apt).join(urn, wad);
+        CoinJoinLike(apt).join(cdpHandler, wad);
     }
 }
 
@@ -163,15 +163,15 @@ contract GebProxyActions is Common {
     function _getGeneratedDeltaDebt(
         address cdpEngine,
         address taxCollector,
-        address urn,
+        address cdpHandler,
         bytes32 collateralType,
         uint wad
     ) internal returns (int deltaDebt) {
         // Updates stability fee rate
         uint rate = TaxCollectorLike(taxCollector).taxSingle(collateralType);
 
-        // Gets COIN balance of the urn in the cdpEngine
-        uint coin = CDPEngineLike(cdpEngine).coinBalance(urn);
+        // Gets COIN balance of the handler in the cdpEngine
+        uint coin = CDPEngineLike(cdpEngine).coinBalance(cdpHandler);
 
         // If there was already enough COIN in the cdpEngine balance, just exits it without adding more debt
         if (coin < mul(wad, RAY)) {
@@ -459,7 +459,7 @@ contract GebProxyActions is Common {
         uint wad = convertTo18(collateralJoin, amt);
         // Unlocks token amount from the CDP
         modifyCDPCollateralization(manager, cdp, -toInt(wad), 0);
-        // Moves the amount from the CDP urn to proxy's address
+        // Moves the amount from the CDP handler to proxy's address
         transferCollateral(manager, cdp, address(this), wad);
         // Exits token amount to the user's wallet as a token
         CollateralJoinLike(collateralJoin).exit(msg.sender, amt);
@@ -471,7 +471,7 @@ contract GebProxyActions is Common {
         uint cdp,
         uint wad
     ) public {
-        // Moves the amount from the CDP urn to proxy's address
+        // Moves the amount from the CDP handler to proxy's address
         transferCollateral(manager, cdp, address(this), wad);
         // Exits WETH amount to proxy address as a token
         CollateralJoinLike(ethJoin).exit(address(this), wad);
@@ -487,7 +487,7 @@ contract GebProxyActions is Common {
         uint cdp,
         uint amt
     ) public {
-        // Moves the amount from the CDP urn to proxy's address
+        // Moves the amount from the CDP handler to proxy's address
         transferCollateral(manager, cdp, address(this), convertTo18(collateralJoin, amt));
 
         // Exits token amount to the user's wallet as a token
