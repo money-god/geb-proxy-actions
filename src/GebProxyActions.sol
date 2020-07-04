@@ -336,10 +336,10 @@ contract GebProxyActions is Common {
     function modifyCDPCollateralization(
         address manager,
         uint cdp,
-        int dink,
+        int deltaCollateral,
         int deltaDebt
     ) public {
-        ManagerLike(manager).modifyCDPCollateralization(cdp, dink, deltaDebt);
+        ManagerLike(manager).modifyCDPCollateralization(cdp, deltaCollateral, deltaDebt);
     }
 
     function quitSystem(
