@@ -361,9 +361,9 @@ contract GebProxyActions is Common {
     function moveCDP(
         address manager,
         uint cdpSrc,
-        uint cdpOrg
+        uint cdpDst
     ) public {
-        ManagerLike(manager).moveCDP(cdpSrc, cdpOrg);
+        ManagerLike(manager).moveCDP(cdpSrc, cdpDst);
     }
 
     function makeCollateralBag(
