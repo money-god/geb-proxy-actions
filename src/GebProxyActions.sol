@@ -41,6 +41,7 @@ abstract contract ManagerLike {
     function quitSystem(uint, address) virtual public;
     function enterSystem(address, uint) virtual public;
     function moveCDP(uint, uint) virtual public;
+    function protectCDP(uint, address, address) virtual public;
 }
 
 abstract contract CDPEngineLike {
@@ -366,6 +367,15 @@ contract GebProxyActions is Common {
         ManagerLike(manager).moveCDP(cdpSrc, cdpDst);
     }
 
+    function protectCDP(
+        address manager,
+        uint cdp,
+        address liquidationEngine,
+        address saviour
+    ) public {
+        ManagerLike(manager).protectCDP(cdp, liquidationEngine, saviour);
+    }
+
     function makeCollateralBag(
         address collateralJoin
     ) public returns (address bag) {
@@ -516,6 +526,19 @@ contract GebProxyActions is Common {
         CoinJoinLike(coinJoin).exit(msg.sender, wad);
     }
 
+    function generateDebtAndProtectCDP(
+        address manager,
+        address taxCollector,
+        address coinJoin,
+        uint cdp,
+        uint wad,
+        address liquidationEngine,
+        address saviour
+    ) public {
+        generateDebt(manager, taxCollector, coinJoin, cdp, wad);
+        protectCDP(manager, cdp, liquidationEngine, saviour);
+    }
+
     function repayDebt(
         address manager,
         address coinJoin,
@@ -636,6 +659,21 @@ contract GebProxyActions is Common {
         lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, cdp, deltaWad);
     }
 
+    function openLockETHGenerateDebtAndProtectCDP(
+        address manager,
+        address taxCollector,
+        address ethJoin,
+        address coinJoin,
+        bytes32 collateralType,
+        uint deltaWad,
+        address liquidationEngine,
+        address saviour
+    ) public payable returns (uint cdp) {
+        cdp = openCDP(manager, collateralType, address(this));
+        lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, cdp, deltaWad);
+        protectCDP(manager, cdp, liquidationEngine, saviour);
+    }
+
     function lockTokenCollateralAndGenerateDebt(
         address manager,
         address taxCollector,
@@ -663,6 +701,31 @@ contract GebProxyActions is Common {
         CoinJoinLike(coinJoin).exit(msg.sender, deltaWad);
     }
 
+    function lockTokenCollateralGenerateDebtAndProtectCDP(
+        address manager,
+        address taxCollector,
+        address collateralJoin,
+        address coinJoin,
+        uint cdp,
+        uint collateralAmount,
+        uint deltaWad,
+        bool transferFrom,
+        address liquidationEngine,
+        address saviour
+    ) public {
+        lockTokenCollateralAndGenerateDebt(
+          manager,
+          taxCollector,
+          collateralJoin,
+          coinJoin,
+          cdp,
+          collateralAmount,
+          deltaWad,
+          transferFrom
+        );
+        protectCDP(manager, cdp, liquidationEngine, saviour);
+    }
+
     function openLockTokenCollateralAndGenerateDebt(
         address manager,
         address taxCollector,
@@ -675,6 +738,23 @@ contract GebProxyActions is Common {
     ) public returns (uint cdp) {
         cdp = openCDP(manager, collateralType, address(this));
         lockTokenCollateralAndGenerateDebt(manager, taxCollector, collateralJoin, coinJoin, cdp, collateralAmount, deltaWad, transferFrom);
+    }
+
+    function openLockTokenCollateralGenerateDebtAndProtectCDP(
+        address manager,
+        address taxCollector,
+        address collateralJoin,
+        address coinJoin,
+        bytes32 collateralType,
+        uint collateralAmount,
+        uint deltaWad,
+        bool transferFrom,
+        address liquidationEngine,
+        address saviour
+    ) public returns (uint cdp) {
+        cdp = openCDP(manager, collateralType, address(this));
+        lockTokenCollateralAndGenerateDebt(manager, taxCollector, collateralJoin, coinJoin, cdp, collateralAmount, deltaWad, transferFrom);
+        protectCDP(manager, cdp, liquidationEngine, saviour);
     }
 
     function openLockGNTAndGenerateDebt(
@@ -694,6 +774,28 @@ contract GebProxyActions is Common {
         // Transfer funds to the funds which previously were sent to the proxy
         CollateralLike(CollateralJoinLike(gntJoin).collateral()).transfer(bag, collateralAmount);
         cdp = openLockTokenCollateralAndGenerateDebt(manager, taxCollector, gntJoin, coinJoin, collateralType, collateralAmount, deltaWad, false);
+    }
+
+    function openLockGNTGenerateDebtAndProtectCDP(
+        address manager,
+        address taxCollector,
+        address gntJoin,
+        address coinJoin,
+        bytes32 collateralType,
+        uint collateralAmount,
+        uint deltaWad,
+        address liquidationEngine,
+        address saviour
+    ) public returns (address bag, uint cdp) {
+        // Creates bag (if doesn't exist) to hold GNT
+        bag = GNTJoinLike(gntJoin).bags(address(this));
+        if (bag == address(0)) {
+            bag = makeCollateralBag(gntJoin);
+        }
+        // Transfer funds to the funds which previously were sent to the proxy
+        CollateralLike(CollateralJoinLike(gntJoin).collateral()).transfer(bag, collateralAmount);
+        cdp = openLockTokenCollateralAndGenerateDebt(manager, taxCollector, gntJoin, coinJoin, collateralType, collateralAmount, deltaWad, false);
+        protectCDP(manager, cdp, liquidationEngine, saviour);
     }
 
     function repayDebtAndFreeETH(
