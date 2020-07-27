@@ -913,7 +913,6 @@ contract GebProxyActions is Common {
 
 contract GebProxyActionsGlobalSettlement is Common {
     // Internal functions
-
     function _freeCollateral(
         address manager,
         address globalSettlement,
