@@ -4,7 +4,7 @@ import "ds-test/test.sol";
 
 import "../GebProxyActions.sol";
 
-import {GebDeployTestBase, CollateralAuctionHouse} from "geb-deploy/GebDeploy.t.base.sol";
+import {GebDeployTestBase, EnglishCollateralAuctionHouse} from "geb-deploy/GebDeploy.t.base.sol";
 import {DGD, GNT} from "./tokens.sol";
 import {CollateralJoin3, CollateralJoin4} from "geb-deploy/AdvancedTokenAdapters.sol";
 import {DSValue} from "ds-value/value.sol";
@@ -266,22 +266,24 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     CollateralJoin3 dgdJoin;
     DGD dgd;
     DSValue orclDGD;
-    CollateralAuctionHouse dgdCollateralAuctionHouse;
-    CollateralJoin4 gntCollateralAuctionHouse;
+    EnglishCollateralAuctionHouse dgdEnglishCollateralAuctionHouse;
+    CollateralJoin4 gntCollateralJoin;
     GNT gnt;
     DSValue orclGNT;
     ProxyRegistry registry;
 
+    bytes32 collateralAuctionType = bytes32("ENGLISH");
+
     function setUp() override public {
         super.setUp();
-        deployStableKeepAuth();
+        deployStableKeepAuth(collateralAuctionType);
 
         // Add a token collateral
         dgd = new DGD(1000 * 10 ** 9);
         dgdJoin = new CollateralJoin3(address(cdpEngine), "DGD", address(dgd), 9);
         orclDGD = new DSValue();
-        gebDeploy.deployCollateral("DGD", address(dgdJoin), address(orclDGD), 1);
-        (dgdCollateralAuctionHouse, ) = gebDeploy.collateralTypes("DGD");
+        gebDeploy.deployCollateral(bytes32("ENGLISH"), "DGD", address(dgdJoin), address(orclDGD), 1);
+        (dgdEnglishCollateralAuctionHouse, ,) = gebDeploy.collateralTypes("DGD");
         orclDGD.updateResult(bytes32(uint(50 ether))); // Price 50 COIN = 1 DGD (in precision 18)
         this.modifyParameters(address(oracleRelayer), "DGD", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
         this.modifyParameters(address(oracleRelayer), "DGD", "liquidationCRatio", uint(1500000000 ether)); // Liquidation ratio 150%
@@ -292,9 +294,9 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(safetyPrice, 50 * ONE * ONE / 1500000000 ether);
 
         gnt = new GNT(1000000 ether);
-        gntCollateralAuctionHouse = new CollateralJoin4(address(cdpEngine), "GNT", address(gnt));
+        gntCollateralJoin = new CollateralJoin4(address(cdpEngine), "GNT", address(gnt));
         orclGNT = new DSValue();
-        gebDeploy.deployCollateral("GNT", address(gntCollateralAuctionHouse), address(orclGNT), 0);
+        gebDeploy.deployCollateral(bytes32("ENGLISH"), "GNT", address(gntCollateralJoin), address(orclGNT), 0);
         orclGNT.updateResult(bytes32(uint(100 ether))); // Price 100 COIN = 1 GNT
         this.modifyParameters(address(oracleRelayer), "GNT", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
         this.modifyParameters(address(oracleRelayer), "GNT", "liquidationCRatio", uint(1500000000 ether)); // Liquidation ratio 150%
@@ -489,12 +491,12 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint cdp = this.openCDP(address(manager), "GNT", address(proxy));
         assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 0);
         uint prevBalance = gnt.balanceOf(address(this));
-        address bag = this.makeCollateralBag(address(gntCollateralAuctionHouse));
+        address bag = this.makeCollateralBag(address(gntCollateralJoin));
         assertEq(gnt.balanceOf(bag), 0);
         gnt.transfer(bag, 2 ether);
         assertEq(gnt.balanceOf(address(this)), prevBalance - 2 ether);
         assertEq(gnt.balanceOf(bag), 2 ether);
-        this.lockTokenCollateral(address(manager), address(gntCollateralAuctionHouse), cdp, 2 ether, false);
+        this.lockTokenCollateral(address(manager), address(gntCollateralJoin), cdp, 2 ether, false);
         assertEq(lockedCollateral("GNT", manager.cdps(cdp)),  2 ether);
         assertEq(gnt.balanceOf(bag), 0);
     }
@@ -552,10 +554,10 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint cdp = this.openCDP(address(manager), "GNT", address(proxy));
         assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 0);
         uint prevBalance = gnt.balanceOf(address(this));
-        address bag = this.makeCollateralBag(address(gntCollateralAuctionHouse));
+        address bag = this.makeCollateralBag(address(gntCollateralJoin));
         gnt.transfer(bag, 2 ether);
-        this.lockTokenCollateral(address(manager), address(gntCollateralAuctionHouse), cdp, 2 ether, false);
-        this.freeTokenCollateral(address(manager), address(gntCollateralAuctionHouse), cdp, 1 ether);
+        this.lockTokenCollateral(address(manager), address(gntCollateralJoin), cdp, 2 ether, false);
+        this.freeTokenCollateral(address(manager), address(gntCollateralJoin), cdp, 1 ether);
         assertEq(lockedCollateral("GNT", manager.cdps(cdp)),  1 ether);
         assertEq(gnt.balanceOf(address(this)), prevBalance - 1 ether);
     }
@@ -739,9 +741,9 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint cdp = this.openCDP(address(manager), "GNT", address(proxy));
         assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 0);
         uint prevBalance = gnt.balanceOf(address(this));
-        address bag = this.makeCollateralBag(address(gntCollateralAuctionHouse));
+        address bag = this.makeCollateralBag(address(gntCollateralJoin));
         gnt.transfer(bag, 3 ether);
-        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralAuctionHouse), address(coinJoin), cdp, 3 ether, 50 ether, false);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), cdp, 3 ether, 50 ether, false);
         assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 3 ether);
         assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(gnt.balanceOf(address(this)), prevBalance - 3 ether);
@@ -759,10 +761,10 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
     function testOpenLockTokenCollateralGNTAndGenerateDebt() public {
         assertEq(coin.balanceOf(address(this)), 0);
-        address bag = this.makeCollateralBag(address(gntCollateralAuctionHouse));
-        assertEq(address(bag), gntCollateralAuctionHouse.bags(address(proxy)));
+        address bag = this.makeCollateralBag(address(gntCollateralJoin));
+        assertEq(address(bag), gntCollateralJoin.bags(address(proxy)));
         gnt.transfer(bag, 2 ether);
-        uint cdp = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralAuctionHouse), address(coinJoin), "GNT", 2 ether, 10 ether, false);
+        uint cdp = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether, false);
         assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 10 ether);
     }
@@ -770,8 +772,8 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     function testOpenLockTokenCollateralGNTAndGenerateDebtSafe() public {
         assertEq(coin.balanceOf(address(this)), 0);
         gnt.transfer(address(proxy), 2 ether);
-        (address bag, uint cdp) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralAuctionHouse), address(coinJoin), "GNT", 2 ether, 10 ether);
-        assertEq(address(bag), gntCollateralAuctionHouse.bags(address(proxy)));
+        (address bag, uint cdp) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
+        assertEq(address(bag), gntCollateralJoin.bags(address(proxy)));
         assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 10 ether);
     }
@@ -779,9 +781,9 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     function testOpenLockTokenCollateralGNTAndGenerateDebtSafeTwice() public {
         assertEq(coin.balanceOf(address(this)), 0);
         gnt.transfer(address(proxy), 4 ether);
-        (address bag, uint cdp) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralAuctionHouse), address(coinJoin), "GNT", 2 ether, 10 ether);
-        (address bag2, uint cdp2) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralAuctionHouse), address(coinJoin), "GNT", 2 ether, 10 ether);
-        assertEq(address(bag), gntCollateralAuctionHouse.bags(address(proxy)));
+        (address bag, uint cdp) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
+        (address bag2, uint cdp2) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
+        assertEq(address(bag), gntCollateralJoin.bags(address(proxy)));
         assertEq(address(bag), address(bag2));
         assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 2 ether);
         assertEq(lockedCollateral("GNT", manager.cdps(cdp2)), 2 ether);
@@ -950,11 +952,11 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
         user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
 
-        user1.doCDPApprove(address(cdpEngine), address(ethCollateralAuctionHouse));
-        user2.doCDPApprove(address(cdpEngine), address(ethCollateralAuctionHouse));
+        user1.doCDPApprove(address(cdpEngine), address(ethEnglishCollateralAuctionHouse));
+        user2.doCDPApprove(address(cdpEngine), address(ethEnglishCollateralAuctionHouse));
 
-        user1.doIncreaseBidSize(address(ethCollateralAuctionHouse), batchId, 1 ether, rad(200 ether));
-        user2.doDecreaseSoldAmount(address(ethCollateralAuctionHouse), batchId, 0.7 ether, rad(200 ether));
+        user1.doIncreaseBidSize(address(ethEnglishCollateralAuctionHouse), batchId, 1 ether, rad(200 ether));
+        user2.doDecreaseSoldAmount(address(ethEnglishCollateralAuctionHouse), batchId, 0.7 ether, rad(200 ether));
     }
 
     function testExitETHAfterCollateralAuction() public {
@@ -987,12 +989,12 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
         user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
 
-        user1.doCDPApprove(address(cdpEngine), address(colAuctionHouse));
-        user2.doCDPApprove(address(cdpEngine), address(colAuctionHouse));
+        user1.doCDPApprove(address(cdpEngine), address(colEnglishCollateralAuctionHouse));
+        user2.doCDPApprove(address(cdpEngine), address(colEnglishCollateralAuctionHouse));
 
-        user1.doIncreaseBidSize(address(colAuctionHouse), batchId, 1 ether, rad(40 ether));
+        user1.doIncreaseBidSize(address(colEnglishCollateralAuctionHouse), batchId, 1 ether, rad(40 ether));
 
-        user2.doDecreaseSoldAmount(address(colAuctionHouse), batchId, 0.7 ether, rad(40 ether));
+        user2.doDecreaseSoldAmount(address(colEnglishCollateralAuctionHouse), batchId, 0.7 ether, rad(40 ether));
         assertEq(cdpEngine.tokenCollateral("COL", manager.cdps(cdp)), 0.3 ether);
         assertEq(col.balanceOf(address(this)), 0);
         this.exitTokenCollateral(address(manager), address(colJoin), cdp, 0.3 ether);
@@ -1020,12 +1022,12 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
         user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
 
-        user1.doCDPApprove(address(cdpEngine), address(dgdCollateralAuctionHouse));
-        user2.doCDPApprove(address(cdpEngine), address(dgdCollateralAuctionHouse));
+        user1.doCDPApprove(address(cdpEngine), address(dgdEnglishCollateralAuctionHouse));
+        user2.doCDPApprove(address(cdpEngine), address(dgdEnglishCollateralAuctionHouse));
 
-        user1.doIncreaseBidSize(address(dgdCollateralAuctionHouse), batchId, 1 ether, rad(30 ether));
+        user1.doIncreaseBidSize(address(dgdEnglishCollateralAuctionHouse), batchId, 1 ether, rad(30 ether));
 
-        user2.doDecreaseSoldAmount(address(dgdCollateralAuctionHouse), batchId, 0.7 ether, rad(30 ether));
+        user2.doDecreaseSoldAmount(address(dgdEnglishCollateralAuctionHouse), batchId, 0.7 ether, rad(30 ether));
         assertEq(cdpEngine.tokenCollateral("DGD", manager.cdps(cdp)), 0.3 ether);
         uint prevBalance = dgd.balanceOf(address(this));
         this.exitTokenCollateral(address(manager), address(dgdJoin), cdp, 0.3 * 10 ** 9);
