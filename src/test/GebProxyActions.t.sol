@@ -33,7 +33,7 @@ contract ProxyCalls {
         proxy.execute(gebProxyActions, msg.data);
     }
 
-    function giveToProxy(address, address, uint, address) public {
+    function transferCDPOwnershipToProxy(address, address, uint, address) public {
         proxy.execute(gebProxyActions, msg.data);
     }
 
@@ -348,14 +348,14 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     function testGiveCDPToProxy() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         address userProxy = registry.build(address(123));
-        this.giveToProxy(address(registry), address(manager), cdp, address(123));
+        this.transferCDPOwnershipToProxy(address(registry), address(manager), cdp, address(123));
         assertEq(manager.ownsCDP(cdp), userProxy);
     }
 
     function testGiveCDPToNewProxy() public {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         assertEq(address(registry.proxies(address(123))), address(0));
-        this.giveToProxy(address(registry), address(manager), cdp, address(123));
+        this.transferCDPOwnershipToProxy(address(registry), address(manager), cdp, address(123));
         DSProxy userProxy = registry.proxies(address(123));
         assertTrue(address(userProxy) != address(0));
         assertEq(userProxy.owner(), address(123));
@@ -366,7 +366,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
         FakeUser user = new FakeUser();
         assertEq(address(registry.proxies(address(user))), address(0));
-        this.giveToProxy(address(registry), address(manager), cdp, address(user)); // Fails as user is a contract and not a regular address
+        this.transferCDPOwnershipToProxy(address(registry), address(manager), cdp, address(user)); // Fails as user is a contract and not a regular address
     }
 
     function testGiveCDPAllowedUser() public {

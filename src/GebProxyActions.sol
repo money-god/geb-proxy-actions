@@ -200,7 +200,7 @@ contract GebProxyActions is Common {
         deltaDebt = uint(deltaDebt) <= generatedDebt ? - deltaDebt : - toInt(generatedDebt);
     }
 
-    function _getWipeAllDebt(
+    function _getRepaidAlDebt(
         address cdpEngine,
         address usr,
         address cdp,
@@ -276,7 +276,7 @@ contract GebProxyActions is Common {
         ManagerLike(manager).transferCDPOwnership(cdp, usr);
     }
 
-    function giveToProxy(
+    function transferCDPOwnershipToProxy(
         address proxyRegistry,
         address manager,
         uint cdp,
@@ -594,12 +594,12 @@ contract GebProxyActions is Common {
         address own = ManagerLike(manager).ownsCDP(cdp);
         if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
             // Joins COIN amount into the cdpEngine
-            coinJoin_join(coinJoin, cdpHandler, _getWipeAllDebt(cdpEngine, cdpHandler, cdpHandler, collateralType));
+            coinJoin_join(coinJoin, cdpHandler, _getRepaidAlDebt(cdpEngine, cdpHandler, cdpHandler, collateralType));
             // Paybacks debt to the CDP
             modifyCDPCollateralization(manager, cdp, 0, -int(generatedDebt));
         } else {
             // Joins COIN amount into the cdpEngine
-            coinJoin_join(coinJoin, address(this), _getWipeAllDebt(cdpEngine, address(this), cdpHandler, collateralType));
+            coinJoin_join(coinJoin, address(this), _getRepaidAlDebt(cdpEngine, address(this), cdpHandler, collateralType));
             // Paybacks debt to the CDP
             CDPEngineLike(cdpEngine).modifyCDPCollateralization(
                 collateralType,
@@ -839,7 +839,7 @@ contract GebProxyActions is Common {
         (, uint generatedDebt) = CDPEngineLike(cdpEngine).cdps(collateralType, cdpHandler);
 
         // Joins COIN amount into the cdpEngine
-        coinJoin_join(coinJoin, cdpHandler, _getWipeAllDebt(cdpEngine, cdpHandler, cdpHandler, collateralType));
+        coinJoin_join(coinJoin, cdpHandler, _getRepaidAlDebt(cdpEngine, cdpHandler, cdpHandler, collateralType));
         // Paybacks debt to the CDP and unlocks WETH amount from it
         modifyCDPCollateralization(
             manager,
@@ -895,7 +895,7 @@ contract GebProxyActions is Common {
         (, uint generatedDebt) = CDPEngineLike(cdpEngine).cdps(collateralType, cdpHandler);
 
         // Joins COIN amount into the cdpEngine
-        coinJoin_join(coinJoin, cdpHandler, _getWipeAllDebt(cdpEngine, cdpHandler, cdpHandler, collateralType));
+        coinJoin_join(coinJoin, cdpHandler, _getRepaidAlDebt(cdpEngine, cdpHandler, cdpHandler, collateralType));
         uint collateralWad = convertTo18(collateralJoin, collateralAmount);
         // Paybacks debt to the CDP and unlocks token amount from it
         modifyCDPCollateralization(
