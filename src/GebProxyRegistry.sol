@@ -4,6 +4,9 @@ import 'ds-proxy/proxy.sol';
 
 // This Registry deploys new proxy instances through DSProxyFactory.build(address) and keeps a registry of owner => proxy
 contract GebProxyRegistry {
+    // --- Events ---
+    event Build(address usr, address proxy);
+
     mapping(address => DSProxy) public proxies;
     DSProxyFactory factory;
 
@@ -15,6 +18,7 @@ contract GebProxyRegistry {
     // sets owner of proxy to caller
     function build() public returns (address payable proxy) {
         proxy = build(msg.sender);
+        emit Build(msg.sender, proxy);
     }
 
     // deploys a new proxy instance
@@ -23,5 +27,6 @@ contract GebProxyRegistry {
         require(proxies[owner] == DSProxy(0) || proxies[owner].owner() != owner); // Not allow new proxy if the user already has one and remains being the owner
         proxy = factory.build(owner);
         proxies[owner] = DSProxy(proxy);
+        emit Build(owner, proxy);
     }
 }
