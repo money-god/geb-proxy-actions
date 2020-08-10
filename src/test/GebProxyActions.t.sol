@@ -282,7 +282,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         dgd = new DGD(1000 * 10 ** 9);
         dgdJoin = new CollateralJoin3(address(cdpEngine), "DGD", address(dgd), 9);
         orclDGD = new DSValue();
-        gebDeploy.deployCollateral(bytes32("ENGLISH"), "DGD", address(dgdJoin), address(orclDGD), address(orclDGD), 1);
+        gebDeploy.deployCollateral(bytes32("ENGLISH"), "DGD", address(dgdJoin), address(orclDGD), address(orclDGD), address(0), 1);
         (dgdEnglishCollateralAuctionHouse, ,) = gebDeploy.collateralTypes("DGD");
         orclDGD.updateResult(bytes32(uint(50 ether))); // Price 50 COIN = 1 DGD (in precision 18)
         this.modifyParameters(address(oracleRelayer), "DGD", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
@@ -296,7 +296,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         gnt = new GNT(1000000 ether);
         gntCollateralJoin = new CollateralJoin4(address(cdpEngine), "GNT", address(gnt));
         orclGNT = new DSValue();
-        gebDeploy.deployCollateral(bytes32("ENGLISH"), "GNT", address(gntCollateralJoin), address(orclGNT), address(orclGNT), 0);
+        gebDeploy.deployCollateral(bytes32("ENGLISH"), "GNT", address(gntCollateralJoin), address(orclGNT), address(orclGNT), address(0), 0);
         orclGNT.updateResult(bytes32(uint(100 ether))); // Price 100 COIN = 1 GNT
         this.modifyParameters(address(oracleRelayer), "GNT", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
         this.modifyParameters(address(oracleRelayer), "GNT", "liquidationCRatio", uint(1500000000 ether)); // Liquidation ratio 150%
@@ -1128,10 +1128,10 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
         assertEq(coin.balanceOf(address(this)), 0 ether);
-        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRates(), 50 ether * ONE);
+        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRate(), 50 ether * ONE);
         hevm.warp(initialTime + 1); // Moved 1 second
         coinSavingsAccount.updateAccumulatedRate();
-        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRates(), 52.5 ether * ONE); // Now the equivalent COIN amount is 2.5 COIN extra
+        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRate(), 52.5 ether * ONE); // Now the equivalent COIN amount is 2.5 COIN extra
         this.coinSavingsAccount_withdraw(address(coinJoin), address(coinSavingsAccount), 52.5 ether);
         assertEq(coin.balanceOf(address(this)), 52.5 ether);
         assertEq(coinSavingsAccount.savings(address(proxy)), 0);
@@ -1150,10 +1150,10 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
         assertEq(coin.balanceOf(address(this)), 0 ether);
         // Due rounding the COIN equivalent is not the same than initial wad amount
-        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRates(), 49999999999999999999350000000000000000000000000);
+        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRate(), 49999999999999999999350000000000000000000000000);
         hevm.warp(initialTime + 1);
         coinSavingsAccount.updateAccumulatedRate(); // Just necessary to check in this test the updated value of chi
-        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRates(), 52499999999999999999317500000000000000000000000);
+        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRate(), 52499999999999999999317500000000000000000000000);
         this.coinSavingsAccount_withdraw(address(coinJoin), address(coinSavingsAccount), 52.5 ether);
         assertEq(coin.balanceOf(address(this)), 52499999999999999999);
         assertEq(coinSavingsAccount.savings(address(proxy)), 0);
@@ -1170,7 +1170,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(coinSavingsAccount.savings(address(this)), 0 ether);
         this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
-        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRates(), 49999999999999999999993075745400000000000000000);
+        assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRate(), 49999999999999999999993075745400000000000000000);
         assertEq(cdpEngine.coinBalance(address(proxy)), mul(50 ether, ONE) - 49999999999999999999993075745400000000000000000);
         this.coinSavingsAccount_withdraw(address(coinJoin), address(coinSavingsAccount), 50 ether);
         // In this case we get the full 50 COIN back as we also use (for the exit) the dust that remained in the proxy COIN balance in the cdpEngine
