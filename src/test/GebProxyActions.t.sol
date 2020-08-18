@@ -10,7 +10,7 @@ import {CollateralJoin3, CollateralJoin4} from "geb-deploy/AdvancedTokenAdapters
 import {DSValue} from "ds-value/value.sol";
 import {GebCdpManager} from "geb-cdp-manager/GebCdpManager.sol";
 import {GetCdps} from "geb-cdp-manager/GetCdps.sol";
-import {ProxyRegistry, DSProxyFactory, DSProxy} from "proxy-registry/ProxyRegistry.sol";
+import {GebProxyRegistry, DSProxyFactory, DSProxy} from "geb-proxy-registry/GebProxyRegistry.sol";
 
 contract ProxyCalls {
     DSProxy proxy;
@@ -270,7 +270,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     CollateralJoin4 gntCollateralJoin;
     GNT gnt;
     DSValue orclGNT;
-    ProxyRegistry registry;
+    GebProxyRegistry registry;
 
     bytes32 collateralAuctionType = bytes32("ENGLISH");
 
@@ -284,7 +284,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         orclDGD = new DSValue();
         gebDeploy.deployCollateral(bytes32("ENGLISH"), "DGD", address(dgdJoin), address(orclDGD), address(orclDGD), address(0), 1);
         (dgdEnglishCollateralAuctionHouse, ,) = gebDeploy.collateralTypes("DGD");
-        orclDGD.updateResult(bytes32(uint(50 ether))); // Price 50 COIN = 1 DGD (in precision 18)
+        orclDGD.updateResult(uint(50 ether)); // Price 50 COIN = 1 DGD (in precision 18)
         this.modifyParameters(address(oracleRelayer), "DGD", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
         this.modifyParameters(address(oracleRelayer), "DGD", "liquidationCRatio", uint(1500000000 ether)); // Liquidation ratio 150%
 
@@ -297,7 +297,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         gntCollateralJoin = new CollateralJoin4(address(cdpEngine), "GNT", address(gnt));
         orclGNT = new DSValue();
         gebDeploy.deployCollateral(bytes32("ENGLISH"), "GNT", address(gntCollateralJoin), address(orclGNT), address(orclGNT), address(0), 0);
-        orclGNT.updateResult(bytes32(uint(100 ether))); // Price 100 COIN = 1 GNT
+        orclGNT.updateResult(uint(100 ether)); // Price 100 COIN = 1 GNT
         this.modifyParameters(address(oracleRelayer), "GNT", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
         this.modifyParameters(address(oracleRelayer), "GNT", "liquidationCRatio", uint(1500000000 ether)); // Liquidation ratio 150%
 
@@ -308,7 +308,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
         manager = new GebCdpManager(address(cdpEngine));
         DSProxyFactory factory = new DSProxyFactory();
-        registry = new ProxyRegistry(address(factory));
+        registry = new GebProxyRegistry(address(factory));
         gebProxyActions = address(new GebProxyActions());
         gebProxyActionsGlobalSettlement = address(new GebProxyActionsGlobalSettlement());
         gebProxyActionsCoinSavingsAccount = address(new GebProxyActionsCoinSavingsAccount());
@@ -940,7 +940,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
         cdp = this.openCDP(address(manager), "ETH", address(proxy));
         this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 200 ether); // Maximun COIN generated
-        orclETH.updateResult(bytes32(uint(300 * 10 ** 18 - 1))); // Force liquidation
+        orclETH.updateResult(uint(300 * 10 ** 18 - 1)); // Force liquidation
         oracleRelayer.updateCollateralPrice("ETH");
         uint batchId = liquidationEngine.liquidateCDP("ETH", manager.cdps(cdp));
 
@@ -977,7 +977,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         col.approve(address(proxy), 1 ether);
         this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), cdp, 1 ether, 40 ether, true);
 
-        orclCOL.updateResult(bytes32(uint(40 * 10 ** 18))); // Force liquidation
+        orclCOL.updateResult(uint(40 * 10 ** 18)); // Force liquidation
         oracleRelayer.updateCollateralPrice("COL");
         uint batchId = liquidationEngine.liquidateCDP("COL", manager.cdps(cdp));
 
@@ -1010,7 +1010,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         dgd.approve(address(proxy), 1 * 10 ** 9);
         this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), cdp, 1 * 10 ** 9, 30 ether, true);
 
-        orclDGD.updateResult(bytes32(uint(40 * 10 ** 18))); // Force liquidation
+        orclDGD.updateResult(uint(40 * 10 ** 18)); // Force liquidation
         oracleRelayer.updateCollateralPrice("DGD");
         uint batchId = liquidationEngine.liquidateCDP("DGD", manager.cdps(cdp));
 
