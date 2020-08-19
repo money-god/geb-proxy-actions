@@ -4,7 +4,7 @@ import "ds-test/test.sol";
 
 import "../GebProxyActions.sol";
 
-import {GebDeployTestBase, EnglishCollateralAuctionHouse} from "geb-deploy/GebDeploy.t.base.sol";
+import {GebDeployTestBase, EnglishCollateralAuctionHouse} from "geb-deploy/test/GebDeploy.t.base.sol";
 import {DGD, GNT} from "./tokens.sol";
 import {CollateralJoin3, CollateralJoin4} from "geb-deploy/AdvancedTokenAdapters.sol";
 import {DSValue} from "ds-value/value.sol";
