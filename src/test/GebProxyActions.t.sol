@@ -8,8 +8,8 @@ import {GebDeployTestBase, EnglishCollateralAuctionHouse} from "geb-deploy/test/
 import {DGD, GNT} from "./tokens.sol";
 import {CollateralJoin3, CollateralJoin4} from "geb-deploy/AdvancedTokenAdapters.sol";
 import {DSValue} from "ds-value/value.sol";
-import {GebCdpManager} from "geb-cdp-manager/GebCdpManager.sol";
-import {GetCdps} from "geb-cdp-manager/GetCdps.sol";
+import {GebSafeManager} from "geb-safe-manager/GebSafeManager.sol";
+import {GetSafes} from "geb-safe-manager/GetSafes.sol";
 import {GebProxyRegistry, DSProxyFactory, DSProxy} from "geb-proxy-registry/GebProxyRegistry.sol";
 
 contract ProxyCalls {
@@ -22,22 +22,22 @@ contract ProxyCalls {
         proxy.execute(gebProxyActions, msg.data);
     }
 
-    function openCDP(address, bytes32, address) public returns (uint cdp) {
+    function openSAFE(address, bytes32, address) public returns (uint safe) {
         bytes memory response = proxy.execute(gebProxyActions, msg.data);
         assembly {
-            cdp := mload(add(response, 0x20))
+            safe := mload(add(response, 0x20))
         }
     }
 
-    function transferCDPOwnership(address, uint, address) public {
+    function transferSAFEOwnership(address, uint, address) public {
         proxy.execute(gebProxyActions, msg.data);
     }
 
-    function transferCDPOwnershipToProxy(address, address, uint, address) public {
+    function transferSAFEOwnershipToProxy(address, address, uint, address) public {
         proxy.execute(gebProxyActions, msg.data);
     }
 
-    function allowCDP(address, uint, address, uint) public {
+    function allowSAFE(address, uint, address, uint) public {
         proxy.execute(gebProxyActions, msg.data);
     }
 
@@ -45,11 +45,11 @@ contract ProxyCalls {
         proxy.execute(gebProxyActions, msg.data);
     }
 
-    function approveCDPModification(address, address) public {
+    function approveSAFEModification(address, address) public {
         proxy.execute(gebProxyActions, msg.data);
     }
 
-    function denyCDPModification(address, address) public {
+    function denySAFEModification(address, address) public {
         proxy.execute(gebProxyActions, msg.data);
     }
 
@@ -61,11 +61,11 @@ contract ProxyCalls {
         proxy.execute(gebProxyActions, msg.data);
     }
 
-    function modifyCDPCollateralization(address, uint, int, int) public {
+    function modifySAFECollateralization(address, uint, int, int) public {
         proxy.execute(gebProxyActions, msg.data);
     }
 
-    function modifyCDPCollateralization(address, uint, address, int, int) public {
+    function modifySAFECollateralization(address, uint, address, int, int) public {
         proxy.execute(gebProxyActions, msg.data);
     }
 
@@ -77,7 +77,7 @@ contract ProxyCalls {
         proxy.execute(gebProxyActions, msg.data);
     }
 
-    function moveCDP(address, uint, uint) public {
+    function moveSAFE(address, uint, uint) public {
         proxy.execute(gebProxyActions, msg.data);
     }
 
@@ -161,7 +161,7 @@ contract ProxyCalls {
         require(success, "");
     }
 
-    function openLockETHAndGenerateDebt(address, address, address, address, bytes32, uint) public payable returns (uint cdp) {
+    function openLockETHAndGenerateDebt(address, address, address, address, bytes32, uint) public payable returns (uint safe) {
         address payable target = address(proxy);
         bytes memory data = abi.encodeWithSignature("execute(address,bytes)", gebProxyActions, msg.data);
         assembly {
@@ -172,7 +172,7 @@ contract ProxyCalls {
             mstore(response, size)
             returndatacopy(add(response, 0x20), 0, size)
 
-            cdp := mload(add(response, 0x60))
+            safe := mload(add(response, 0x60))
 
             switch iszero(succeeded)
             case 1 {
@@ -186,18 +186,18 @@ contract ProxyCalls {
         proxy.execute(gebProxyActions, msg.data);
     }
 
-    function openLockTokenCollateralAndGenerateDebt(address, address, address, address, bytes32, uint, uint, bool) public returns (uint cdp) {
+    function openLockTokenCollateralAndGenerateDebt(address, address, address, address, bytes32, uint, uint, bool) public returns (uint safe) {
         bytes memory response = proxy.execute(gebProxyActions, msg.data);
         assembly {
-            cdp := mload(add(response, 0x20))
+            safe := mload(add(response, 0x20))
         }
     }
 
-    function openLockGNTAndGenerateDebt(address, address, address, address, bytes32, uint, uint) public returns (address bag, uint cdp) {
+    function openLockGNTAndGenerateDebt(address, address, address, address, bytes32, uint, uint) public returns (address bag, uint safe) {
         bytes memory response = proxy.execute(gebProxyActions, msg.data);
         assembly {
             bag := mload(add(response, 0x20))
-            cdp := mload(add(response, 0x40))
+            safe := mload(add(response, 0x40))
         }
     }
 
@@ -251,17 +251,17 @@ contract ProxyCalls {
 }
 
 contract FakeUser {
-    function doTransferCDPOwnership(
-        GebCdpManager manager,
-        uint cdp,
+    function doTransferSAFEOwnership(
+        GebSafeManager manager,
+        uint safe,
         address dst
     ) public {
-        manager.transferCDPOwnership(cdp, dst);
+        manager.transferSAFEOwnership(safe, dst);
     }
 }
 
 contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
-    GebCdpManager manager;
+    GebSafeManager manager;
 
     CollateralJoin3 dgdJoin;
     DGD dgd;
@@ -280,7 +280,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
         // Add a token collateral
         dgd = new DGD(1000 * 10 ** 9);
-        dgdJoin = new CollateralJoin3(address(cdpEngine), "DGD", address(dgd), 9);
+        dgdJoin = new CollateralJoin3(address(safeEngine), "DGD", address(dgd), 9);
         orclDGD = new DSValue();
         gebDeploy.deployCollateral(bytes32("ENGLISH"), "DGD", address(dgdJoin), address(orclDGD), address(orclDGD), address(0), 1);
         (dgdEnglishCollateralAuctionHouse, ,) = gebDeploy.collateralTypes("DGD");
@@ -288,25 +288,25 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.modifyParameters(address(oracleRelayer), "DGD", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
         this.modifyParameters(address(oracleRelayer), "DGD", "liquidationCRatio", uint(1500000000 ether)); // Liquidation ratio 150%
 
-        this.modifyParameters(address(cdpEngine), bytes32("DGD"), bytes32("debtCeiling"), uint(10000 * 10 ** 45));
+        this.modifyParameters(address(safeEngine), bytes32("DGD"), bytes32("debtCeiling"), uint(10000 * 10 ** 45));
         oracleRelayer.updateCollateralPrice("DGD");
-        (,,uint safetyPrice,,,) = cdpEngine.collateralTypes("DGD");
+        (,,uint safetyPrice,,,) = safeEngine.collateralTypes("DGD");
         assertEq(safetyPrice, 50 * ONE * ONE / 1500000000 ether);
 
         gnt = new GNT(1000000 ether);
-        gntCollateralJoin = new CollateralJoin4(address(cdpEngine), "GNT", address(gnt));
+        gntCollateralJoin = new CollateralJoin4(address(safeEngine), "GNT", address(gnt));
         orclGNT = new DSValue();
         gebDeploy.deployCollateral(bytes32("ENGLISH"), "GNT", address(gntCollateralJoin), address(orclGNT), address(orclGNT), address(0), 0);
         orclGNT.updateResult(uint(100 ether)); // Price 100 COIN = 1 GNT
         this.modifyParameters(address(oracleRelayer), "GNT", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
         this.modifyParameters(address(oracleRelayer), "GNT", "liquidationCRatio", uint(1500000000 ether)); // Liquidation ratio 150%
 
-        this.modifyParameters(address(cdpEngine), bytes32("GNT"), bytes32("debtCeiling"), uint(10000 * 10 ** 45));
+        this.modifyParameters(address(safeEngine), bytes32("GNT"), bytes32("debtCeiling"), uint(10000 * 10 ** 45));
         oracleRelayer.updateCollateralPrice("GNT");
-        (,, safetyPrice,,,) = cdpEngine.collateralTypes("GNT");
+        (,, safetyPrice,,,) = safeEngine.collateralTypes("GNT");
         assertEq(safetyPrice, 100 * ONE * ONE / 1500000000 ether);
 
-        manager = new GebCdpManager(address(cdpEngine));
+        manager = new GebSafeManager(address(safeEngine));
         DSProxyFactory factory = new DSProxyFactory();
         registry = new GebProxyRegistry(address(factory));
         gebProxyActions = address(new GebProxyActions());
@@ -316,11 +316,11 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     }
 
     function lockedCollateral(bytes32 collateralType, address urn) public view returns (uint lktCollateral) {
-        (lktCollateral,) = cdpEngine.cdps(collateralType, urn);
+        (lktCollateral,) = safeEngine.safes(collateralType, urn);
     }
 
     function generatedDebt(bytes32 collateralType, address urn) public view returns (uint genDebt) {
-        (,genDebt) = cdpEngine.cdps(collateralType, urn);
+        (,genDebt) = safeEngine.safes(collateralType, urn);
     }
 
     function testTransfer() public {
@@ -333,48 +333,48 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(col.balanceOf(address(123)), 4);
     }
 
-    function testCreateCDP() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        assertEq(cdp, 1);
-        assertEq(manager.ownsCDP(cdp), address(proxy));
+    function testCreateSAFE() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        assertEq(safe, 1);
+        assertEq(manager.ownsSAFE(safe), address(proxy));
     }
 
-    function testTransferCDPOwnership() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.transferCDPOwnership(address(manager), cdp, address(123));
-        assertEq(manager.ownsCDP(cdp), address(123));
+    function testTransferSAFEOwnership() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.transferSAFEOwnership(address(manager), safe, address(123));
+        assertEq(manager.ownsSAFE(safe), address(123));
     }
 
-    function testGiveCDPToProxy() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+    function testGiveSAFEToProxy() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         address userProxy = registry.build(address(123));
-        this.transferCDPOwnershipToProxy(address(registry), address(manager), cdp, address(123));
-        assertEq(manager.ownsCDP(cdp), userProxy);
+        this.transferSAFEOwnershipToProxy(address(registry), address(manager), safe, address(123));
+        assertEq(manager.ownsSAFE(safe), userProxy);
     }
 
-    function testGiveCDPToNewProxy() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+    function testGiveSAFEToNewProxy() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         assertEq(address(registry.proxies(address(123))), address(0));
-        this.transferCDPOwnershipToProxy(address(registry), address(manager), cdp, address(123));
+        this.transferSAFEOwnershipToProxy(address(registry), address(manager), safe, address(123));
         DSProxy userProxy = registry.proxies(address(123));
         assertTrue(address(userProxy) != address(0));
         assertEq(userProxy.owner(), address(123));
-        assertEq(manager.ownsCDP(cdp), address(userProxy));
+        assertEq(manager.ownsSAFE(safe), address(userProxy));
     }
 
-    function testFailGiveCDPToNewContractProxy() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+    function testFailGiveSAFEToNewContractProxy() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         FakeUser user = new FakeUser();
         assertEq(address(registry.proxies(address(user))), address(0));
-        this.transferCDPOwnershipToProxy(address(registry), address(manager), cdp, address(user)); // Fails as user is a contract and not a regular address
+        this.transferSAFEOwnershipToProxy(address(registry), address(manager), safe, address(user)); // Fails as user is a contract and not a regular address
     }
 
-    function testGiveCDPAllowedUser() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+    function testGiveSAFEAllowedUser() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         FakeUser user = new FakeUser();
-        this.allowCDP(address(manager), cdp, address(user), 1);
-        user.doTransferCDPOwnership(manager, cdp, address(123));
-        assertEq(manager.ownsCDP(cdp), address(123));
+        this.allowSAFE(address(manager), safe, address(user), 1);
+        user.doTransferSAFEOwnership(manager, safe, address(123));
+        assertEq(manager.ownsSAFE(safe), address(123));
     }
 
     function testAllowUrn() public {
@@ -386,283 +386,283 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     }
 
     function testTransferCollateral() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
 
         assertEq(coin.balanceOf(address(this)), 0);
         weth.deposit{value: 1 ether}();
         weth.approve(address(ethJoin), uint(-1));
-        ethJoin.join(manager.cdps(cdp), 1 ether);
-        assertEq(cdpEngine.tokenCollateral("ETH", address(this)), 0);
-        assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 1 ether);
+        ethJoin.join(manager.safes(safe), 1 ether);
+        assertEq(safeEngine.tokenCollateral("ETH", address(this)), 0);
+        assertEq(safeEngine.tokenCollateral("ETH", manager.safes(safe)), 1 ether);
 
-        this.transferCollateral(address(manager), cdp, address(this), 0.75 ether);
+        this.transferCollateral(address(manager), safe, address(this), 0.75 ether);
 
-        assertEq(cdpEngine.tokenCollateral("ETH", address(this)), 0.75 ether);
-        assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 0.25 ether);
+        assertEq(safeEngine.tokenCollateral("ETH", address(this)), 0.75 ether);
+        assertEq(safeEngine.tokenCollateral("ETH", manager.safes(safe)), 0.25 ether);
     }
 
-    function testModifyCDPCollateralization() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+    function testModifySAFECollateralization() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
 
         assertEq(coin.balanceOf(address(this)), 0);
         weth.deposit{value: 1 ether}();
         weth.approve(address(ethJoin), uint(-1));
-        ethJoin.join(manager.cdps(cdp), 1 ether);
+        ethJoin.join(manager.safes(safe), 1 ether);
 
-        this.modifyCDPCollateralization(address(manager), cdp, 0.5 ether, 60 ether);
-        assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 0.5 ether);
-        assertEq(cdpEngine.coinBalance(manager.cdps(cdp)), mul(ONE, 60 ether));
-        assertEq(cdpEngine.coinBalance(address(this)), 0);
+        this.modifySAFECollateralization(address(manager), safe, 0.5 ether, 60 ether);
+        assertEq(safeEngine.tokenCollateral("ETH", manager.safes(safe)), 0.5 ether);
+        assertEq(safeEngine.coinBalance(manager.safes(safe)), mul(ONE, 60 ether));
+        assertEq(safeEngine.coinBalance(address(this)), 0);
 
-        this.transferInternalCoins(address(manager), cdp, address(this), mul(ONE, 60 ether));
-        assertEq(cdpEngine.coinBalance(manager.cdps(cdp)), 0);
-        assertEq(cdpEngine.coinBalance(address(this)), mul(ONE, 60 ether));
+        this.transferInternalCoins(address(manager), safe, address(this), mul(ONE, 60 ether));
+        assertEq(safeEngine.coinBalance(manager.safes(safe)), 0);
+        assertEq(safeEngine.coinBalance(address(this)), mul(ONE, 60 ether));
 
-        cdpEngine.approveCDPModification(address(coinJoin));
+        safeEngine.approveSAFEModification(address(coinJoin));
         coinJoin.exit(address(this), 60 ether);
         assertEq(coin.balanceOf(address(this)), 60 ether);
     }
 
     function testLockETH() public {
         uint initialBalance = address(this).balance;
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0);
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 2 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 0);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 2 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
     }
 
     function testSafeLockETH() public {
         uint initialBalance = address(this).balance;
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0);
-        this.safeLockETH{value: 2 ether}(address(manager), address(ethJoin), cdp, address(proxy));
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 2 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 0);
+        this.safeLockETH{value: 2 ether}(address(manager), address(ethJoin), safe, address(proxy));
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 2 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
     }
 
-    function testLockETHOtherCDPOwner() public {
+    function testLockETHOtherSAFEOwner() public {
         uint initialBalance = address(this).balance;
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.transferCDPOwnership(address(manager), cdp, address(123));
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0);
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 2 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.transferSAFEOwnership(address(manager), safe, address(123));
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 0);
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 2 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
     }
 
-    function testFailSafeLockETHOtherCDPOwner() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.transferCDPOwnership(address(manager), cdp, address(123));
-        this.safeLockETH{value: 2 ether}(address(manager), address(ethJoin), cdp, address(321));
+    function testFailSafeLockETHOtherSAFEOwner() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.transferSAFEOwnership(address(manager), safe, address(123));
+        this.safeLockETH{value: 2 ether}(address(manager), address(ethJoin), safe, address(321));
     }
 
     function testLockTokenCollateral() public {
         col.mint(5 ether);
-        uint cdp = this.openCDP(address(manager), "COL", address(proxy));
+        uint safe = this.openSAFE(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 2 ether);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 0);
-        this.lockTokenCollateral(address(manager), address(colJoin), cdp, 2 ether, true);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 2 ether);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 0);
+        this.lockTokenCollateral(address(manager), address(colJoin), safe, 2 ether, true);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 2 ether);
         assertEq(col.balanceOf(address(this)), 3 ether);
     }
 
     function testSafeLockTokenCollateral() public {
         col.mint(5 ether);
-        uint cdp = this.openCDP(address(manager), "COL", address(proxy));
+        uint safe = this.openSAFE(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 2 ether);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 0);
-        this.safeLockTokenCollateral(address(manager), address(colJoin), cdp, 2 ether, true, address(proxy));
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 2 ether);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 0);
+        this.safeLockTokenCollateral(address(manager), address(colJoin), safe, 2 ether, true, address(proxy));
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 2 ether);
         assertEq(col.balanceOf(address(this)), 3 ether);
     }
 
     function testLockTokenCollateralDGD() public {
-        uint cdp = this.openCDP(address(manager), "DGD", address(proxy));
+        uint safe = this.openSAFE(address(manager), "DGD", address(proxy));
         dgd.approve(address(proxy), 2 * 10 ** 9);
-        assertEq(lockedCollateral("DGD", manager.cdps(cdp)), 0);
+        assertEq(lockedCollateral("DGD", manager.safes(safe)), 0);
         uint prevBalance = dgd.balanceOf(address(this));
-        this.lockTokenCollateral(address(manager), address(dgdJoin), cdp, 2 * 10 ** 9, true);
-        assertEq(lockedCollateral("DGD", manager.cdps(cdp)),  2 ether);
+        this.lockTokenCollateral(address(manager), address(dgdJoin), safe, 2 * 10 ** 9, true);
+        assertEq(lockedCollateral("DGD", manager.safes(safe)),  2 ether);
         assertEq(dgd.balanceOf(address(this)), prevBalance - 2 * 10 ** 9);
     }
 
     function testLockTokenCollateralGNT() public {
-        uint cdp = this.openCDP(address(manager), "GNT", address(proxy));
-        assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 0);
+        uint safe = this.openSAFE(address(manager), "GNT", address(proxy));
+        assertEq(lockedCollateral("GNT", manager.safes(safe)), 0);
         uint prevBalance = gnt.balanceOf(address(this));
         address bag = this.makeCollateralBag(address(gntCollateralJoin));
         assertEq(gnt.balanceOf(bag), 0);
         gnt.transfer(bag, 2 ether);
         assertEq(gnt.balanceOf(address(this)), prevBalance - 2 ether);
         assertEq(gnt.balanceOf(bag), 2 ether);
-        this.lockTokenCollateral(address(manager), address(gntCollateralJoin), cdp, 2 ether, false);
-        assertEq(lockedCollateral("GNT", manager.cdps(cdp)),  2 ether);
+        this.lockTokenCollateral(address(manager), address(gntCollateralJoin), safe, 2 ether, false);
+        assertEq(lockedCollateral("GNT", manager.safes(safe)),  2 ether);
         assertEq(gnt.balanceOf(bag), 0);
     }
 
-    function testLockTokenCollateralOtherCDPOwner() public {
+    function testLockTokenCollateralOtherSAFEOwner() public {
         col.mint(5 ether);
-        uint cdp = this.openCDP(address(manager), "COL", address(proxy));
-        this.transferCDPOwnership(address(manager), cdp, address(123));
+        uint safe = this.openSAFE(address(manager), "COL", address(proxy));
+        this.transferSAFEOwnership(address(manager), safe, address(123));
         col.approve(address(proxy), 2 ether);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 0);
-        this.lockTokenCollateral(address(manager), address(colJoin), cdp, 2 ether, true);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 2 ether);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 0);
+        this.lockTokenCollateral(address(manager), address(colJoin), safe, 2 ether, true);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 2 ether);
         assertEq(col.balanceOf(address(this)), 3 ether);
     }
 
-    function testFailSafeLockTokenCollateralOtherCDPOwner() public {
+    function testFailSafeLockTokenCollateralOtherSAFEOwner() public {
         col.mint(5 ether);
-        uint cdp = this.openCDP(address(manager), "COL", address(proxy));
-        this.transferCDPOwnership(address(manager), cdp, address(123));
+        uint safe = this.openSAFE(address(manager), "COL", address(proxy));
+        this.transferSAFEOwnership(address(manager), safe, address(123));
         col.approve(address(proxy), 2 ether);
-        this.safeLockTokenCollateral(address(manager), address(colJoin), cdp, 2 ether, true, address(321));
+        this.safeLockTokenCollateral(address(manager), address(colJoin), safe, 2 ether, true, address(321));
     }
 
     function testFreeETH() public {
         uint initialBalance = address(this).balance;
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        this.freeETH(address(manager), address(ethJoin), cdp, 1 ether);
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 1 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        this.freeETH(address(manager), address(ethJoin), safe, 1 ether);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 1 ether);
         assertEq(address(this).balance, initialBalance - 1 ether);
     }
 
     function testFreeTokenCollateral() public {
         col.mint(5 ether);
-        uint cdp = this.openCDP(address(manager), "COL", address(proxy));
+        uint safe = this.openSAFE(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 2 ether);
-        this.lockTokenCollateral(address(manager), address(colJoin), cdp, 2 ether, true);
-        this.freeTokenCollateral(address(manager), address(colJoin), cdp, 1 ether);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 1 ether);
+        this.lockTokenCollateral(address(manager), address(colJoin), safe, 2 ether, true);
+        this.freeTokenCollateral(address(manager), address(colJoin), safe, 1 ether);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 1 ether);
         assertEq(col.balanceOf(address(this)), 4 ether);
     }
 
     function testFreeTokenCollateralDGD() public {
-        uint cdp = this.openCDP(address(manager), "DGD", address(proxy));
+        uint safe = this.openSAFE(address(manager), "DGD", address(proxy));
         dgd.approve(address(proxy), 2 * 10 ** 9);
-        assertEq(lockedCollateral("DGD", manager.cdps(cdp)), 0);
+        assertEq(lockedCollateral("DGD", manager.safes(safe)), 0);
         uint prevBalance = dgd.balanceOf(address(this));
-        this.lockTokenCollateral(address(manager), address(dgdJoin), cdp, 2 * 10 ** 9, true);
-        this.freeTokenCollateral(address(manager), address(dgdJoin), cdp, 1 * 10 ** 9);
-        assertEq(lockedCollateral("DGD", manager.cdps(cdp)),  1 ether);
+        this.lockTokenCollateral(address(manager), address(dgdJoin), safe, 2 * 10 ** 9, true);
+        this.freeTokenCollateral(address(manager), address(dgdJoin), safe, 1 * 10 ** 9);
+        assertEq(lockedCollateral("DGD", manager.safes(safe)),  1 ether);
         assertEq(dgd.balanceOf(address(this)), prevBalance - 1 * 10 ** 9);
     }
 
     function testFreeTokenCollateralGNT() public {
-        uint cdp = this.openCDP(address(manager), "GNT", address(proxy));
-        assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 0);
+        uint safe = this.openSAFE(address(manager), "GNT", address(proxy));
+        assertEq(lockedCollateral("GNT", manager.safes(safe)), 0);
         uint prevBalance = gnt.balanceOf(address(this));
         address bag = this.makeCollateralBag(address(gntCollateralJoin));
         gnt.transfer(bag, 2 ether);
-        this.lockTokenCollateral(address(manager), address(gntCollateralJoin), cdp, 2 ether, false);
-        this.freeTokenCollateral(address(manager), address(gntCollateralJoin), cdp, 1 ether);
-        assertEq(lockedCollateral("GNT", manager.cdps(cdp)),  1 ether);
+        this.lockTokenCollateral(address(manager), address(gntCollateralJoin), safe, 2 ether, false);
+        this.freeTokenCollateral(address(manager), address(gntCollateralJoin), safe, 1 ether);
+        assertEq(lockedCollateral("GNT", manager.safes(safe)),  1 ether);
         assertEq(gnt.balanceOf(address(this)), prevBalance - 1 ether);
     }
 
     function testGenerateDebt() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
         assertEq(coin.balanceOf(address(this)), 0);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         assertEq(coin.balanceOf(address(this)), 300 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 300 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
     }
 
     function testGenerateDebtAfterCollectingTax() public {
         this.modifyParameters(address(taxCollector), bytes32("ETH"), bytes32("stabilityFee"), uint(1.05 * 10 ** 27));
         hevm.warp(now + 1);
         taxCollector.taxSingle("ETH"); // This is actually not necessary as `generateDebt` will also call taxSingle
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
         assertEq(coin.balanceOf(address(this)), 0);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         assertEq(coin.balanceOf(address(this)), 300 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), mul(300 ether, ONE) / (1.05 * 10 ** 27) + 1); // Extra wei due rounding
+        assertEq(generatedDebt("ETH", manager.safes(safe)), mul(300 ether, ONE) / (1.05 * 10 ** 27) + 1); // Extra wei due rounding
     }
 
     function testRepayDebt() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 100 ether);
-        this.repayDebt(address(manager), address(coinJoin), cdp, 100 ether);
+        this.repayDebt(address(manager), address(coinJoin), safe, 100 ether);
         assertEq(coin.balanceOf(address(this)), 200 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 200 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 200 ether);
     }
 
     function testRepayDebtAll() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 300 ether);
-        this.repayAllDebt(address(manager), address(coinJoin), cdp);
+        this.repayAllDebt(address(manager), address(coinJoin), safe);
         assertEq(coin.balanceOf(address(this)), 0);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 0);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 0);
     }
 
     function testSafeRepayDebt() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 100 ether);
-        this.safeRepayDebt(address(manager), address(coinJoin), cdp, 100 ether, address(proxy));
+        this.safeRepayDebt(address(manager), address(coinJoin), safe, 100 ether, address(proxy));
         assertEq(coin.balanceOf(address(this)), 200 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 200 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 200 ether);
     }
 
     function testSafeRepayAllDebt() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 300 ether);
-        this.safeRepayAllDebt(address(manager), address(coinJoin), cdp, address(proxy));
+        this.safeRepayAllDebt(address(manager), address(coinJoin), safe, address(proxy));
         assertEq(coin.balanceOf(address(this)), 0);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 0);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 0);
     }
 
-    function testRepayDebtOtherCDPOwner() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+    function testRepayDebtOtherSAFEOwner() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 100 ether);
-        this.transferCDPOwnership(address(manager), cdp, address(123));
-        this.repayDebt(address(manager), address(coinJoin), cdp, 100 ether);
+        this.transferSAFEOwnership(address(manager), safe, address(123));
+        this.repayDebt(address(manager), address(coinJoin), safe, 100 ether);
         assertEq(coin.balanceOf(address(this)), 200 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 200 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 200 ether);
     }
 
-    function testFailSafeRepayDebtOtherCDPOwner() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+    function testFailSafeRepayDebtOtherSAFEOwner() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 100 ether);
-        this.transferCDPOwnership(address(manager), cdp, address(123));
-        this.safeRepayDebt(address(manager), address(coinJoin), cdp, 100 ether, address(321));
+        this.transferSAFEOwnership(address(manager), safe, address(123));
+        this.safeRepayDebt(address(manager), address(coinJoin), safe, 100 ether, address(321));
     }
 
-    function testFailSafeRepayDebtAllOtherCDPOwner() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+    function testFailSafeRepayDebtAllOtherSAFEOwner() public {
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 300 ether);
-        this.transferCDPOwnership(address(manager), cdp, address(123));
-        this.safeRepayAllDebt(address(manager), address(coinJoin), cdp, address(321));
+        this.transferSAFEOwnership(address(manager), safe, address(123));
+        this.safeRepayAllDebt(address(manager), address(coinJoin), safe, address(321));
     }
 
     function testRepayDebtAfterTaxation() public {
         this.modifyParameters(address(taxCollector), bytes32("ETH"), bytes32("stabilityFee"), uint(1.05 * 10 ** 27));
         hevm.warp(now + 1);
         taxCollector.taxSingle("ETH");
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 100 ether);
-        this.repayDebt(address(manager), address(coinJoin), cdp, 100 ether);
+        this.repayDebt(address(manager), address(coinJoin), safe, 100 ether);
         assertEq(coin.balanceOf(address(this)), 200 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), mul(200 ether, ONE) / (1.05 * 10 ** 27) + 1);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), mul(200 ether, ONE) / (1.05 * 10 ** 27) + 1);
     }
 
     function testRepayAllDebtAfterTaxation() public {
@@ -670,12 +670,12 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.modifyParameters(address(taxCollector), bytes32("ETH"), bytes32("stabilityFee"), uint(1.05 * 10 ** 27));
         hevm.warp(now + 1);
         taxCollector.taxSingle("ETH");
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), cdp);
-        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 300 ether);
-        this.repayDebt(address(manager), address(coinJoin), cdp, 300 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 0);
+        this.repayDebt(address(manager), address(coinJoin), safe, 300 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 0);
     }
 
     function testRepayAllDebtAfterTaxation2() public {
@@ -683,24 +683,24 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.modifyParameters(address(taxCollector), bytes32("ETH"), bytes32("stabilityFee"), uint(1.05 * 10 ** 27));
         hevm.warp(now + 1);
         taxCollector.taxSingle("ETH"); // This is actually not necessary as `draw` will also call taxSingle
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         uint times = 30;
-        this.lockETH{value: 2 ether * times}(address(manager), address(ethJoin), cdp);
+        this.lockETH{value: 2 ether * times}(address(manager), address(ethJoin), safe);
         for (uint i = 0; i < times; i++) {
-            this.generateDebt(address(manager), address(taxCollector), address(coinJoin), cdp, 300 ether);
+            this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
         }
         coin.approve(address(proxy), 300 ether * times);
-        this.repayDebt(address(manager), address(coinJoin), cdp, 300 ether * times);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 0);
+        this.repayDebt(address(manager), address(coinJoin), safe, 300 ether * times);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 0);
     }
 
     function testLockETHAndGenerateDebt() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         uint initialBalance = address(this).balance;
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 0);
         assertEq(coin.balanceOf(address(this)), 0);
-        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 2 ether);
+        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safe, 300 ether);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 300 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
     }
@@ -708,43 +708,43 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     function testOpenLockETHAndGenerateDebt() public {
         uint initialBalance = address(this).balance;
         assertEq(coin.balanceOf(address(this)), 0);
-        uint cdp = this.openLockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), "ETH", 300 ether);
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 2 ether);
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), "ETH", 300 ether);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 300 ether);
         assertEq(address(this).balance, initialBalance - 2 ether);
     }
 
     function testLockTokenCollateralAndGenerateDebt() public {
         col.mint(5 ether);
-        uint cdp = this.openCDP(address(manager), "COL", address(proxy));
+        uint safe = this.openSAFE(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 2 ether);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 0);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 0);
         assertEq(coin.balanceOf(address(this)), 0);
-        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), cdp, 2 ether, 10 ether, true);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 2 ether);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), safe, 2 ether, 10 ether, true);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 10 ether);
         assertEq(col.balanceOf(address(this)), 3 ether);
     }
 
     function testLockTokenCollateralDGDAndGenerateDebt() public {
-        uint cdp = this.openCDP(address(manager), "DGD", address(proxy));
+        uint safe = this.openSAFE(address(manager), "DGD", address(proxy));
         dgd.approve(address(proxy), 3 * 10 ** 9);
-        assertEq(lockedCollateral("DGD", manager.cdps(cdp)), 0);
+        assertEq(lockedCollateral("DGD", manager.safes(safe)), 0);
         uint prevBalance = dgd.balanceOf(address(this));
-        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), cdp, 3 * 10 ** 9, 50 ether, true);
-        assertEq(lockedCollateral("DGD", manager.cdps(cdp)), 3 ether);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), safe, 3 * 10 ** 9, 50 ether, true);
+        assertEq(lockedCollateral("DGD", manager.safes(safe)), 3 ether);
         assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(dgd.balanceOf(address(this)), prevBalance - 3 * 10 ** 9);
     }
 
     function testLockTokenCollateralGNTAndGenerateDebt() public {
-        uint cdp = this.openCDP(address(manager), "GNT", address(proxy));
-        assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 0);
+        uint safe = this.openSAFE(address(manager), "GNT", address(proxy));
+        assertEq(lockedCollateral("GNT", manager.safes(safe)), 0);
         uint prevBalance = gnt.balanceOf(address(this));
         address bag = this.makeCollateralBag(address(gntCollateralJoin));
         gnt.transfer(bag, 3 ether);
-        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), cdp, 3 ether, 50 ether, false);
-        assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 3 ether);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), safe, 3 ether, 50 ether, false);
+        assertEq(lockedCollateral("GNT", manager.safes(safe)), 3 ether);
         assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(gnt.balanceOf(address(this)), prevBalance - 3 ether);
     }
@@ -753,8 +753,8 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         col.mint(5 ether);
         col.approve(address(proxy), 2 ether);
         assertEq(coin.balanceOf(address(this)), 0);
-        uint cdp = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), "COL", 2 ether, 10 ether, true);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 2 ether);
+        uint safe = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), "COL", 2 ether, 10 ether, true);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 10 ether);
         assertEq(col.balanceOf(address(this)), 3 ether);
     }
@@ -764,131 +764,131 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         address bag = this.makeCollateralBag(address(gntCollateralJoin));
         assertEq(address(bag), gntCollateralJoin.bags(address(proxy)));
         gnt.transfer(bag, 2 ether);
-        uint cdp = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether, false);
-        assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 2 ether);
+        uint safe = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether, false);
+        assertEq(lockedCollateral("GNT", manager.safes(safe)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 10 ether);
     }
 
     function testOpenLockTokenCollateralGNTAndGenerateDebtSafe() public {
         assertEq(coin.balanceOf(address(this)), 0);
         gnt.transfer(address(proxy), 2 ether);
-        (address bag, uint cdp) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
+        (address bag, uint safe) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
         assertEq(address(bag), gntCollateralJoin.bags(address(proxy)));
-        assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 2 ether);
+        assertEq(lockedCollateral("GNT", manager.safes(safe)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 10 ether);
     }
 
     function testOpenLockTokenCollateralGNTAndGenerateDebtSafeTwice() public {
         assertEq(coin.balanceOf(address(this)), 0);
         gnt.transfer(address(proxy), 4 ether);
-        (address bag, uint cdp) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
-        (address bag2, uint cdp2) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
+        (address bag, uint safe) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
+        (address bag2, uint safe2) = this.openLockGNTAndGenerateDebt(address(manager), address(taxCollector), address(gntCollateralJoin), address(coinJoin), "GNT", 2 ether, 10 ether);
         assertEq(address(bag), gntCollateralJoin.bags(address(proxy)));
         assertEq(address(bag), address(bag2));
-        assertEq(lockedCollateral("GNT", manager.cdps(cdp)), 2 ether);
-        assertEq(lockedCollateral("GNT", manager.cdps(cdp2)), 2 ether);
+        assertEq(lockedCollateral("GNT", manager.safes(safe)), 2 ether);
+        assertEq(lockedCollateral("GNT", manager.safes(safe2)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 20 ether);
     }
 
     function testRepayDebtAndFreeETH() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         uint initialBalance = address(this).balance;
-        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
+        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 250 ether);
-        this.repayDebtAndFreeETH(address(manager), address(ethJoin), address(coinJoin), cdp, 1.5 ether, 250 ether);
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0.5 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 50 ether);
+        this.repayDebtAndFreeETH(address(manager), address(ethJoin), address(coinJoin), safe, 1.5 ether, 250 ether);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 0.5 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 50 ether);
         assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(address(this).balance, initialBalance - 0.5 ether);
     }
 
     function testRepayAllDebtAndFreeETH() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         uint initialBalance = address(this).balance;
-        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
+        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safe, 300 ether);
         coin.approve(address(proxy), 300 ether);
-        this.repayAllDebtAndFreeETH(address(manager), address(ethJoin), address(coinJoin), cdp, 1.5 ether);
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0.5 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 0);
+        this.repayAllDebtAndFreeETH(address(manager), address(ethJoin), address(coinJoin), safe, 1.5 ether);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 0.5 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 0);
         assertEq(coin.balanceOf(address(this)), 0);
         assertEq(address(this).balance, initialBalance - 0.5 ether);
     }
 
     function testRepayDebtAndFreeTokenCollateral() public {
         col.mint(5 ether);
-        uint cdp = this.openCDP(address(manager), "COL", address(proxy));
+        uint safe = this.openSAFE(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 2 ether);
-        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), cdp, 2 ether, 10 ether, true);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), safe, 2 ether, 10 ether, true);
         coin.approve(address(proxy), 8 ether);
-        this.repayDebtAndFreeTokenCollateral(address(manager), address(colJoin), address(coinJoin), cdp, 1.5 ether, 8 ether);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 0.5 ether);
-        assertEq(generatedDebt("COL", manager.cdps(cdp)), 2 ether);
+        this.repayDebtAndFreeTokenCollateral(address(manager), address(colJoin), address(coinJoin), safe, 1.5 ether, 8 ether);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 0.5 ether);
+        assertEq(generatedDebt("COL", manager.safes(safe)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 2 ether);
         assertEq(col.balanceOf(address(this)), 4.5 ether);
     }
 
     function testRepayAllDebtAndFreeTokenCollateral() public {
         col.mint(5 ether);
-        uint cdp = this.openCDP(address(manager), "COL", address(proxy));
+        uint safe = this.openSAFE(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 2 ether);
-        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), cdp, 2 ether, 10 ether, true);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), safe, 2 ether, 10 ether, true);
         coin.approve(address(proxy), 10 ether);
-        this.repayAllDebtAndFreeTokenCollateral(address(manager), address(colJoin), address(coinJoin), cdp, 1.5 ether);
-        assertEq(lockedCollateral("COL", manager.cdps(cdp)), 0.5 ether);
-        assertEq(generatedDebt("COL", manager.cdps(cdp)), 0);
+        this.repayAllDebtAndFreeTokenCollateral(address(manager), address(colJoin), address(coinJoin), safe, 1.5 ether);
+        assertEq(lockedCollateral("COL", manager.safes(safe)), 0.5 ether);
+        assertEq(generatedDebt("COL", manager.safes(safe)), 0);
         assertEq(coin.balanceOf(address(this)), 0);
         assertEq(col.balanceOf(address(this)), 4.5 ether);
     }
 
     function testWipeAndFreeTokenCollateralDGDAndGenerateDebt() public {
-        uint cdp = this.openCDP(address(manager), "DGD", address(proxy));
+        uint safe = this.openSAFE(address(manager), "DGD", address(proxy));
         dgd.approve(address(proxy), 3 * 10 ** 9);
-        assertEq(lockedCollateral("DGD", manager.cdps(cdp)), 0);
+        assertEq(lockedCollateral("DGD", manager.safes(safe)), 0);
         uint prevBalance = dgd.balanceOf(address(this));
-        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), cdp, 3 * 10 ** 9, 50 ether, true);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), safe, 3 * 10 ** 9, 50 ether, true);
         coin.approve(address(proxy), 25 ether);
-        this.repayDebtAndFreeTokenCollateral(address(manager), address(dgdJoin), address(coinJoin), cdp, 1 * 10 ** 9, 25 ether);
-        assertEq(lockedCollateral("DGD", manager.cdps(cdp)), 2 ether);
+        this.repayDebtAndFreeTokenCollateral(address(manager), address(dgdJoin), address(coinJoin), safe, 1 * 10 ** 9, 25 ether);
+        assertEq(lockedCollateral("DGD", manager.safes(safe)), 2 ether);
         assertEq(coin.balanceOf(address(this)), 25 ether);
         assertEq(dgd.balanceOf(address(this)), prevBalance - 2 * 10 ** 9);
     }
 
     function testPreventHigherCoinOnRepayDebt() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 300 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safe, 300 ether);
 
         weth.deposit{value: 2 ether}();
         weth.approve(address(ethJoin), 2 ether);
         ethJoin.join(address(this), 2 ether);
-        cdpEngine.modifyCDPCollateralization("ETH", address(this), address(this), address(this), 1 ether, 150 ether);
-        cdpEngine.transferInternalCoins(address(this), manager.cdps(cdp), 150 ether);
+        safeEngine.modifySAFECollateralization("ETH", address(this), address(this), address(this), 1 ether, 150 ether);
+        safeEngine.transferInternalCoins(address(this), manager.safes(safe), 150 ether);
 
         coin.approve(address(proxy), 300 ether);
-        this.repayDebt(address(manager), address(coinJoin), cdp, 300 ether);
+        this.repayDebt(address(manager), address(coinJoin), safe, 300 ether);
     }
 
-    function testApproveDenyCDPModification() public {
-        assertEq(cdpEngine.cdpRights(address(proxy), address(123)), 0);
-        this.approveCDPModification(address(cdpEngine), address(123));
-        assertEq(cdpEngine.cdpRights(address(proxy), address(123)), 1);
-        this.denyCDPModification(address(cdpEngine), address(123));
-        assertEq(cdpEngine.cdpRights(address(proxy), address(123)), 0);
+    function testApproveDenySAFEModification() public {
+        assertEq(safeEngine.safeRights(address(proxy), address(123)), 0);
+        this.approveSAFEModification(address(safeEngine), address(123));
+        assertEq(safeEngine.safeRights(address(proxy), address(123)), 1);
+        this.denySAFEModification(address(safeEngine), address(123));
+        assertEq(safeEngine.safeRights(address(proxy), address(123)), 0);
     }
 
     function testQuitSystem() public {
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safe, 50 ether);
 
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 1 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 50 ether);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 1 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 50 ether);
         assertEq(lockedCollateral("ETH", address(proxy)), 0);
         assertEq(generatedDebt("ETH", address(proxy)), 0);
 
-        this.approveCDPModification(address(cdpEngine), address(manager));
-        this.quitSystem(address(manager), cdp, address(proxy));
+        this.approveSAFEModification(address(safeEngine), address(manager));
+        this.quitSystem(address(manager), safe, address(proxy));
 
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 0);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 0);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 0);
         assertEq(lockedCollateral("ETH", address(proxy)), 1 ether);
         assertEq(generatedDebt("ETH", address(proxy)), 50 ether);
     }
@@ -897,202 +897,202 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         weth.deposit{value: 1 ether}();
         weth.approve(address(ethJoin), 1 ether);
         ethJoin.join(address(this), 1 ether);
-        cdpEngine.modifyCDPCollateralization("ETH", address(this), address(this), address(this), 1 ether, 50 ether);
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
+        safeEngine.modifySAFECollateralization("ETH", address(this), address(this), address(this), 1 ether, 50 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
 
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 0);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 0);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 0);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 0);
         assertEq(lockedCollateral("ETH", address(this)), 1 ether);
         assertEq(generatedDebt("ETH", address(this)), 50 ether);
 
-        cdpEngine.approveCDPModification(address(manager));
+        safeEngine.approveSAFEModification(address(manager));
         manager.allowHandler(address(proxy), 1);
-        this.enterSystem(address(manager), address(this), cdp);
+        this.enterSystem(address(manager), address(this), safe);
 
-        assertEq(lockedCollateral("ETH", manager.cdps(cdp)), 1 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdp)), 50 ether);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 1 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 50 ether);
         assertEq(lockedCollateral("ETH", address(this)), 0);
         assertEq(generatedDebt("ETH", address(this)), 0);
     }
 
-    function testMoveCDP() public {
-        uint cdpSrc = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdpSrc, 50 ether);
+    function testMoveSAFE() public {
+        uint safeSrc = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safeSrc, 50 ether);
 
-        uint cdpDst = this.openCDP(address(manager), "ETH", address(proxy));
+        uint safeDst = this.openSAFE(address(manager), "ETH", address(proxy));
 
-        assertEq(lockedCollateral("ETH", manager.cdps(cdpSrc)), 1 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdpSrc)), 50 ether);
-        assertEq(lockedCollateral("ETH", manager.cdps(cdpDst)), 0);
-        assertEq(generatedDebt("ETH", manager.cdps(cdpDst)), 0);
+        assertEq(lockedCollateral("ETH", manager.safes(safeSrc)), 1 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safeSrc)), 50 ether);
+        assertEq(lockedCollateral("ETH", manager.safes(safeDst)), 0);
+        assertEq(generatedDebt("ETH", manager.safes(safeDst)), 0);
 
-        this.moveCDP(address(manager), cdpSrc, cdpDst);
+        this.moveSAFE(address(manager), safeSrc, safeDst);
 
-        assertEq(lockedCollateral("ETH", manager.cdps(cdpSrc)), 0);
-        assertEq(generatedDebt("ETH", manager.cdps(cdpSrc)), 0);
-        assertEq(lockedCollateral("ETH", manager.cdps(cdpDst)), 1 ether);
-        assertEq(generatedDebt("ETH", manager.cdps(cdpDst)), 50 ether);
+        assertEq(lockedCollateral("ETH", manager.safes(safeSrc)), 0);
+        assertEq(generatedDebt("ETH", manager.safes(safeSrc)), 0);
+        assertEq(lockedCollateral("ETH", manager.safes(safeDst)), 1 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safeDst)), 50 ether);
     }
 
-    function _collateralAuctionETH() internal returns (uint cdp) {
-        this.modifyParameters(address(liquidationEngine), "ETH", "collateralToSell", 1 ether); // 1 unit of collateral per batch
-        this.modifyParameters(address(liquidationEngine), "ETH", "liquidationPenalty", ONE);
+    function _collateralAuctionETH() internal returns (uint safe) {
+        this.modifyParameters(address(liquidationEngine), "ETH", "liquidationQuantity", rad(1000 ether));
+        this.modifyParameters(address(liquidationEngine), "ETH", "liquidationPenalty", WAD);
 
-        cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 200 ether); // Maximun COIN generated
+        safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safe, 200 ether); // Maximun COIN generated
         orclETH.updateResult(uint(300 * 10 ** 18 - 1)); // Force liquidation
         oracleRelayer.updateCollateralPrice("ETH");
-        uint batchId = liquidationEngine.liquidateCDP("ETH", manager.cdps(cdp));
+        uint batchId = liquidationEngine.liquidateSAFE("ETH", manager.safes(safe));
 
         address(user1).transfer(10 ether);
         user1.doEthJoin(address(weth), address(ethJoin), address(user1), 10 ether);
-        user1.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user1), address(user1), address(user1), 10 ether, 1000 ether);
+        user1.doModifySAFECollateralization(address(safeEngine), "ETH", address(user1), address(user1), address(user1), 10 ether, 1000 ether);
 
         address(user2).transfer(10 ether);
         user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
-        user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
+        user2.doModifySAFECollateralization(address(safeEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
 
-        user1.doCDPApprove(address(cdpEngine), address(ethEnglishCollateralAuctionHouse));
-        user2.doCDPApprove(address(cdpEngine), address(ethEnglishCollateralAuctionHouse));
+        user1.doSAFEApprove(address(safeEngine), address(ethEnglishCollateralAuctionHouse));
+        user2.doSAFEApprove(address(safeEngine), address(ethEnglishCollateralAuctionHouse));
 
         user1.doIncreaseBidSize(address(ethEnglishCollateralAuctionHouse), batchId, 1 ether, rad(200 ether));
         user2.doDecreaseSoldAmount(address(ethEnglishCollateralAuctionHouse), batchId, 0.7 ether, rad(200 ether));
     }
 
     function testExitETHAfterCollateralAuction() public {
-        uint cdp = _collateralAuctionETH();
-        assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 0.3 ether);
+        uint safe = _collateralAuctionETH();
+        assertEq(safeEngine.tokenCollateral("ETH", manager.safes(safe)), 0.3 ether);
         uint prevBalance = address(this).balance;
-        this.exitETH(address(manager), address(ethJoin), cdp, 0.3 ether);
-        assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 0);
+        this.exitETH(address(manager), address(ethJoin), safe, 0.3 ether);
+        assertEq(safeEngine.tokenCollateral("ETH", manager.safes(safe)), 0);
         assertEq(address(this).balance, prevBalance + 0.3 ether);
     }
 
     function testExitTokenCollateralAfterAuction() public {
-        this.modifyParameters(address(liquidationEngine), "COL", "collateralToSell", 1 ether); // 1 unit of collateral per batch
-        this.modifyParameters(address(liquidationEngine), "COL", "liquidationPenalty", ONE);
+        this.modifyParameters(address(liquidationEngine), "COL", "liquidationQuantity", rad(100 ether));
+        this.modifyParameters(address(liquidationEngine), "COL", "liquidationPenalty", WAD);
 
         col.mint(1 ether);
-        uint cdp = this.openCDP(address(manager), "COL", address(proxy));
+        uint safe = this.openSAFE(address(manager), "COL", address(proxy));
         col.approve(address(proxy), 1 ether);
-        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), cdp, 1 ether, 40 ether, true);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), safe, 1 ether, 40 ether, true);
 
         orclCOL.updateResult(uint(40 * 10 ** 18)); // Force liquidation
         oracleRelayer.updateCollateralPrice("COL");
-        uint batchId = liquidationEngine.liquidateCDP("COL", manager.cdps(cdp));
+        uint batchId = liquidationEngine.liquidateSAFE("COL", manager.safes(safe));
 
         address(user1).transfer(10 ether);
         user1.doEthJoin(address(weth), address(ethJoin), address(user1), 10 ether);
-        user1.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user1), address(user1), address(user1), 10 ether, 1000 ether);
+        user1.doModifySAFECollateralization(address(safeEngine), "ETH", address(user1), address(user1), address(user1), 10 ether, 1000 ether);
 
         address(user2).transfer(10 ether);
         user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
-        user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
+        user2.doModifySAFECollateralization(address(safeEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
 
-        user1.doCDPApprove(address(cdpEngine), address(colEnglishCollateralAuctionHouse));
-        user2.doCDPApprove(address(cdpEngine), address(colEnglishCollateralAuctionHouse));
+        user1.doSAFEApprove(address(safeEngine), address(colEnglishCollateralAuctionHouse));
+        user2.doSAFEApprove(address(safeEngine), address(colEnglishCollateralAuctionHouse));
 
         user1.doIncreaseBidSize(address(colEnglishCollateralAuctionHouse), batchId, 1 ether, rad(40 ether));
 
         user2.doDecreaseSoldAmount(address(colEnglishCollateralAuctionHouse), batchId, 0.7 ether, rad(40 ether));
-        assertEq(cdpEngine.tokenCollateral("COL", manager.cdps(cdp)), 0.3 ether);
+        assertEq(safeEngine.tokenCollateral("COL", manager.safes(safe)), 0.3 ether);
         assertEq(col.balanceOf(address(this)), 0);
-        this.exitTokenCollateral(address(manager), address(colJoin), cdp, 0.3 ether);
-        assertEq(cdpEngine.tokenCollateral("COL", manager.cdps(cdp)), 0);
+        this.exitTokenCollateral(address(manager), address(colJoin), safe, 0.3 ether);
+        assertEq(safeEngine.tokenCollateral("COL", manager.safes(safe)), 0);
         assertEq(col.balanceOf(address(this)), 0.3 ether);
     }
 
     function testExitDGDAfterAuction() public {
-        this.modifyParameters(address(liquidationEngine), "DGD", "collateralToSell", 1 ether); // 1 unit of collateral per batch
-        this.modifyParameters(address(liquidationEngine), "DGD", "liquidationPenalty", ONE);
+        this.modifyParameters(address(liquidationEngine), "DGD", "liquidationQuantity", rad(100 ether));
+        this.modifyParameters(address(liquidationEngine), "DGD", "liquidationPenalty", WAD);
 
-        uint cdp = this.openCDP(address(manager), "DGD", address(proxy));
+        uint safe = this.openSAFE(address(manager), "DGD", address(proxy));
         dgd.approve(address(proxy), 1 * 10 ** 9);
-        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), cdp, 1 * 10 ** 9, 30 ether, true);
+        this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), safe, 1 * 10 ** 9, 30 ether, true);
 
         orclDGD.updateResult(uint(40 * 10 ** 18)); // Force liquidation
         oracleRelayer.updateCollateralPrice("DGD");
-        uint batchId = liquidationEngine.liquidateCDP("DGD", manager.cdps(cdp));
+        uint batchId = liquidationEngine.liquidateSAFE("DGD", manager.safes(safe));
 
         address(user1).transfer(10 ether);
         user1.doEthJoin(address(weth), address(ethJoin), address(user1), 10 ether);
-        user1.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user1), address(user1), address(user1), 10 ether, 1000 ether);
+        user1.doModifySAFECollateralization(address(safeEngine), "ETH", address(user1), address(user1), address(user1), 10 ether, 1000 ether);
 
         address(user2).transfer(10 ether);
         user2.doEthJoin(address(weth), address(ethJoin), address(user2), 10 ether);
-        user2.doModifyCDPCollateralization(address(cdpEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
+        user2.doModifySAFECollateralization(address(safeEngine), "ETH", address(user2), address(user2), address(user2), 10 ether, 1000 ether);
 
-        user1.doCDPApprove(address(cdpEngine), address(dgdEnglishCollateralAuctionHouse));
-        user2.doCDPApprove(address(cdpEngine), address(dgdEnglishCollateralAuctionHouse));
+        user1.doSAFEApprove(address(safeEngine), address(dgdEnglishCollateralAuctionHouse));
+        user2.doSAFEApprove(address(safeEngine), address(dgdEnglishCollateralAuctionHouse));
 
         user1.doIncreaseBidSize(address(dgdEnglishCollateralAuctionHouse), batchId, 1 ether, rad(30 ether));
 
         user2.doDecreaseSoldAmount(address(dgdEnglishCollateralAuctionHouse), batchId, 0.7 ether, rad(30 ether));
-        assertEq(cdpEngine.tokenCollateral("DGD", manager.cdps(cdp)), 0.3 ether);
+        assertEq(safeEngine.tokenCollateral("DGD", manager.safes(safe)), 0.3 ether);
         uint prevBalance = dgd.balanceOf(address(this));
-        this.exitTokenCollateral(address(manager), address(dgdJoin), cdp, 0.3 * 10 ** 9);
-        assertEq(cdpEngine.tokenCollateral("DGD", manager.cdps(cdp)), 0);
+        this.exitTokenCollateral(address(manager), address(dgdJoin), safe, 0.3 * 10 ** 9);
+        assertEq(safeEngine.tokenCollateral("DGD", manager.safes(safe)), 0);
         assertEq(dgd.balanceOf(address(this)), prevBalance + 0.3 * 10 ** 9);
     }
 
     function testLockBackAfterCollateralAuction() public {
-        uint cdp = _collateralAuctionETH();
-        (uint lockedCollateral,) = cdpEngine.cdps("ETH", manager.cdps(cdp));
+        uint safe = _collateralAuctionETH();
+        (uint lockedCollateral,) = safeEngine.safes("ETH", manager.safes(safe));
         assertEq(lockedCollateral, 0);
-        assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 0.3 ether);
-        this.modifyCDPCollateralization(address(manager), cdp, 0.3 ether, 0);
-        (lockedCollateral,) = cdpEngine.cdps("ETH", manager.cdps(cdp));
+        assertEq(safeEngine.tokenCollateral("ETH", manager.safes(safe)), 0.3 ether);
+        this.modifySAFECollateralization(address(manager), safe, 0.3 ether, 0);
+        (lockedCollateral,) = safeEngine.safes("ETH", manager.safes(safe));
         assertEq(lockedCollateral, 0.3 ether);
-        assertEq(cdpEngine.tokenCollateral("ETH", manager.cdps(cdp)), 0);
+        assertEq(safeEngine.tokenCollateral("ETH", manager.safes(safe)), 0);
     }
 
     function testGlobalSettlement() public {
-        this.modifyParameters(address(liquidationEngine), "ETH", "collateralToSell", 1 ether); // 1 unit of collateral per batch
-        this.modifyParameters(address(liquidationEngine), "ETH", "liquidationPenalty", ONE);
+        this.modifyParameters(address(liquidationEngine), "ETH", "liquidationQuantity", rad(100 ether));
+        this.modifyParameters(address(liquidationEngine), "ETH", "liquidationPenalty", WAD);
 
-        uint cdp = this.openLockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), "ETH", 300 ether);
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), "ETH", 300 ether);
         col.mint(1 ether);
         col.approve(address(proxy), 1 ether);
-        uint cdp2 = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), "COL", 1 ether, 5 ether, true);
+        uint safe2 = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(colJoin), address(coinJoin), "COL", 1 ether, 5 ether, true);
         dgd.approve(address(proxy), 1 * 10 ** 9);
-        uint cdp3 = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), "DGD", 1 * 10 ** 9, 5 ether, true);
+        uint safe3 = this.openLockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), "DGD", 1 * 10 ** 9, 5 ether, true);
 
         this.shutdownSystem(address(globalSettlement));
         globalSettlement.freezeCollateralType("ETH");
         globalSettlement.freezeCollateralType("COL");
         globalSettlement.freezeCollateralType("DGD");
 
-        (uint lockedCollateral, uint generatedDebt) = cdpEngine.cdps("ETH", manager.cdps(cdp));
+        (uint lockedCollateral, uint generatedDebt) = safeEngine.safes("ETH", manager.safes(safe));
         assertEq(lockedCollateral, 2 ether);
         assertEq(generatedDebt, 300 ether);
 
-        (lockedCollateral, generatedDebt) = cdpEngine.cdps("COL", manager.cdps(cdp2));
+        (lockedCollateral, generatedDebt) = safeEngine.safes("COL", manager.safes(safe2));
         assertEq(lockedCollateral, 1 ether);
         assertEq(generatedDebt, 5 ether);
 
-        (lockedCollateral, generatedDebt) = cdpEngine.cdps("DGD", manager.cdps(cdp3));
+        (lockedCollateral, generatedDebt) = safeEngine.safes("DGD", manager.safes(safe3));
         assertEq(lockedCollateral, 1 ether);
         assertEq(generatedDebt, 5 ether);
 
         uint prevBalanceETH = address(this).balance;
-        this.globalSettlement_freeETH(address(manager), address(ethJoin), address(globalSettlement), cdp);
-        (lockedCollateral, generatedDebt) = cdpEngine.cdps("ETH", manager.cdps(cdp));
+        this.globalSettlement_freeETH(address(manager), address(ethJoin), address(globalSettlement), safe);
+        (lockedCollateral, generatedDebt) = safeEngine.safes("ETH", manager.safes(safe));
         assertEq(lockedCollateral, 0);
         assertEq(generatedDebt, 0);
         uint remainingCollateralValue = 2 ether - 300 * globalSettlement.finalCoinPerCollateralPrice("ETH") / 10 ** 9; // 2 ETH (deposited) - 300 COIN debt * ETH cage price
         assertEq(address(this).balance, prevBalanceETH + remainingCollateralValue);
 
         uint prevBalanceCol = col.balanceOf(address(this));
-        this.globalSettlement_freeTokenCollateral(address(manager), address(colJoin), address(globalSettlement), cdp2);
-        (lockedCollateral, generatedDebt) = cdpEngine.cdps("COL", manager.cdps(cdp2));
+        this.globalSettlement_freeTokenCollateral(address(manager), address(colJoin), address(globalSettlement), safe2);
+        (lockedCollateral, generatedDebt) = safeEngine.safes("COL", manager.safes(safe2));
         assertEq(lockedCollateral, 0);
         assertEq(generatedDebt, 0);
         remainingCollateralValue = 1 ether - 5 * globalSettlement.finalCoinPerCollateralPrice("COL") / 10 ** 9; // 1 COL (deposited) - 5 COIN debt * COL cage price
         assertEq(col.balanceOf(address(this)), prevBalanceCol + remainingCollateralValue);
 
         uint prevBalanceDGD = dgd.balanceOf(address(this));
-        this.globalSettlement_freeTokenCollateral(address(manager), address(dgdJoin), address(globalSettlement), cdp3);
-        (lockedCollateral, generatedDebt) = cdpEngine.cdps("DGD", manager.cdps(cdp3));
+        this.globalSettlement_freeTokenCollateral(address(manager), address(dgdJoin), address(globalSettlement), safe3);
+        (lockedCollateral, generatedDebt) = safeEngine.safes("DGD", manager.safes(safe3));
         assertEq(lockedCollateral, 0);
         assertEq(generatedDebt, 0);
         remainingCollateralValue = (1 ether - 5 * globalSettlement.finalCoinPerCollateralPrice("DGD") / 10 ** 9) / 10 ** 9; // 1 DGD (deposited) - 5 COIN debt * DGD cage price
@@ -1120,12 +1120,12 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.modifyParameters(address(coinSavingsAccount), "savingsRate", uint(1.05 * 10 ** 27)); // 5% per second
         uint initialTime = 0; // Initial time set to 0 to avoid any intial rounding
         hevm.warp(initialTime);
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safe, 50 ether);
         coin.approve(address(proxy), 50 ether);
         assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(coinSavingsAccount.savings(address(this)), 0 ether);
-        this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
+        this.denySAFEModification(address(safeEngine), address(coinJoin)); // Remove safeEngine permission for coinJoin to test it is correctly re-actisafeEnginee in exit
         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
         assertEq(coin.balanceOf(address(this)), 0 ether);
         assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRate(), 50 ether * ONE);
@@ -1141,12 +1141,12 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.modifyParameters(address(coinSavingsAccount), "savingsRate", uint(1.05 * 10 ** 27));
         uint initialTime = 1; // Initial time set to 1 this way some the pie will not be the same than the initial COIN wad amount
         hevm.warp(initialTime);
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safe, 50 ether);
         coin.approve(address(proxy), 50 ether);
         assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(coinSavingsAccount.savings(address(this)), 0 ether);
-        this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
+        this.denySAFEModification(address(safeEngine), address(coinJoin)); // Remove safeEngine permission for coinJoin to test it is correctly re-actisafeEnginee in exit
         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
         assertEq(coin.balanceOf(address(this)), 0 ether);
         // Due rounding the COIN equivalent is not the same than initial wad amount
@@ -1163,17 +1163,17 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.modifyParameters(address(coinSavingsAccount), "savingsRate", uint(1.03434234324 * 10 ** 27));
         uint initialTime = 1;
         hevm.warp(initialTime);
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safe, 50 ether);
         coin.approve(address(proxy), 50 ether);
         assertEq(coin.balanceOf(address(this)), 50 ether);
         assertEq(coinSavingsAccount.savings(address(this)), 0 ether);
-        this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exit
+        this.denySAFEModification(address(safeEngine), address(coinJoin)); // Remove safeEngine permission for coinJoin to test it is correctly re-actisafeEnginee in exit
         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
         assertEq(coinSavingsAccount.savings(address(proxy)) * coinSavingsAccount.accumulatedRate(), 49999999999999999999993075745400000000000000000);
-        assertEq(cdpEngine.coinBalance(address(proxy)), mul(50 ether, ONE) - 49999999999999999999993075745400000000000000000);
+        assertEq(safeEngine.coinBalance(address(proxy)), mul(50 ether, ONE) - 49999999999999999999993075745400000000000000000);
         this.coinSavingsAccount_withdraw(address(coinJoin), address(coinSavingsAccount), 50 ether);
-        // In this case we get the full 50 COIN back as we also use (for the exit) the dust that remained in the proxy COIN balance in the cdpEngine
+        // In this case we get the full 50 COIN back as we also use (for the exit) the dust that remained in the proxy COIN balance in the safeEngine
         // The proxy function tries to return the wad amount if there is enough balance to do it
         assertEq(coin.balanceOf(address(this)), 50 ether);
     }
@@ -1182,9 +1182,9 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.modifyParameters(address(coinSavingsAccount), "savingsRate", uint(1.03434234324 * 10 ** 27));
         uint initialTime = 1;
         hevm.warp(initialTime);
-        uint cdp = this.openCDP(address(manager), "ETH", address(proxy));
-        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), cdp, 50 ether);
-        this.denyCDPModification(address(cdpEngine), address(coinJoin)); // Remove cdpEngine permission for coinJoin to test it is correctly re-acticdpEnginee in exitAll
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETHAndGenerateDebt{value: 1 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), safe, 50 ether);
+        this.denySAFEModification(address(safeEngine), address(coinJoin)); // Remove safeEngine permission for coinJoin to test it is correctly re-actisafeEnginee in exitAll
         coin.approve(address(proxy), 50 ether);
         this.coinSavingsAccount_deposit(address(coinJoin), address(coinSavingsAccount), 50 ether);
         this.coinSavingsAccount_withdrawAll(address(coinJoin), address(coinSavingsAccount));

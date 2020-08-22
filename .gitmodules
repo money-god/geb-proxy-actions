@@ -1,9 +1,9 @@
 [submodule "lib/proxy-registry"]
 	path = lib/proxy-registry
 	url = https://github.com/reflexer-labs/proxy-registry.git
-[submodule "lib/geb-cdp-manager"]
-	path = lib/geb-cdp-manager
-	url = https://github.com/reflexer-labs/geb-cdp-manager.git
 [submodule "lib/geb-proxy-registry"]
 	path = lib/geb-proxy-registry
 	url = https://github.com/reflexer-labs/geb-proxy-registry.git
+[submodule "lib/geb-safe-manager"]
+	path = lib/geb-safe-manager
+	url = https://github.com/reflexer-labs/geb-safe-manager.git

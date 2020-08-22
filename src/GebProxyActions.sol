@@ -26,31 +26,31 @@ abstract contract CollateralLike {
 }
 
 abstract contract ManagerLike {
-    function cdpCan(address, uint, address) virtual public view returns (uint);
+    function safeCan(address, uint, address) virtual public view returns (uint);
     function collateralTypes(uint) virtual public view returns (bytes32);
-    function ownsCDP(uint) virtual public view returns (address);
-    function cdps(uint) virtual public view returns (address);
-    function cdpEngine() virtual public view returns (address);
-    function openCDP(bytes32, address) virtual public returns (uint);
-    function transferCDPOwnership(uint, address) virtual public;
-    function allowCDP(uint, address, uint) virtual public;
+    function ownsSAFE(uint) virtual public view returns (address);
+    function safes(uint) virtual public view returns (address);
+    function safeEngine() virtual public view returns (address);
+    function openSAFE(bytes32, address) virtual public returns (uint);
+    function transferSAFEOwnership(uint, address) virtual public;
+    function allowSAFE(uint, address, uint) virtual public;
     function allowHandler(address, uint) virtual public;
-    function modifyCDPCollateralization(uint, int, int) virtual public;
+    function modifySAFECollateralization(uint, int, int) virtual public;
     function transferCollateral(uint, address, uint) virtual public;
     function transferInternalCoins(uint, address, uint) virtual public;
     function quitSystem(uint, address) virtual public;
     function enterSystem(address, uint) virtual public;
-    function moveCDP(uint, uint) virtual public;
-    function protectCDP(uint, address, address) virtual public;
+    function moveSAFE(uint, uint) virtual public;
+    function protectSAFE(uint, address, address) virtual public;
 }
 
-abstract contract CDPEngineLike {
-    function canModifyCDP(address, address) virtual public view returns (uint);
+abstract contract SAFEEngineLike {
+    function canModifySAFE(address, address) virtual public view returns (uint);
     function collateralTypes(bytes32) virtual public view returns (uint, uint, uint, uint, uint);
     function coinBalance(address) virtual public view returns (uint);
-    function cdps(bytes32, address) virtual public view returns (uint, uint);
-    function modifyCDPCollateralization(bytes32, address, address, address, int, int) virtual public;
-    function approveCDPModification(address) virtual public;
+    function safes(bytes32, address) virtual public view returns (uint, uint);
+    function modifySAFECollateralization(bytes32, address, address, address, int, int) virtual public;
+    function approveSAFEModification(address) virtual public;
     function transferInternalCoins(address, address, uint) virtual public;
 }
 
@@ -73,15 +73,15 @@ abstract contract DSTokenLike {
 }
 
 abstract contract CoinJoinLike {
-    function cdpEngine() virtual public returns (CDPEngineLike);
+    function safeEngine() virtual public returns (SAFEEngineLike);
     function systemCoin() virtual public returns (DSTokenLike);
     function join(address, uint) virtual public payable;
     function exit(address, uint) virtual public;
 }
 
-abstract contract ApproveCDPModificationLike {
-    function approveCDPModification(address) virtual public;
-    function denyCDPModification(address) virtual public;
+abstract contract ApproveSAFEModificationLike {
+    function approveSAFEModification(address) virtual public;
+    function denySAFEModification(address) virtual public;
 }
 
 abstract contract GlobalSettlementLike {
@@ -89,7 +89,7 @@ abstract contract GlobalSettlementLike {
     function redeemCollateral(bytes32, uint) virtual public;
     function freeCollateral(bytes32) virtual public;
     function prepareCoinsForRedeeming(uint) virtual public;
-    function processCDP(bytes32, address) virtual public;
+    function processSAFE(bytes32, address) virtual public;
 }
 
 abstract contract TaxCollectorLike {
@@ -126,13 +126,13 @@ contract Common {
     }
 
     // Public functions
-    function coinJoin_join(address apt, address cdpHandler, uint wad) public {
+    function coinJoin_join(address apt, address safeHandler, uint wad) public {
         // Gets COIN from the user's wallet
         CoinJoinLike(apt).systemCoin().transferFrom(msg.sender, address(this), wad);
         // Approves adapter to take the COIN amount
         CoinJoinLike(apt).systemCoin().approve(apt, wad);
-        // Joins COIN into the cdpEngine
-        CoinJoinLike(apt).join(cdpHandler, wad);
+        // Joins COIN into the safeEngine
+        CoinJoinLike(apt).join(safeHandler, wad);
     }
 }
 
@@ -162,21 +162,21 @@ contract GebProxyActions is Common {
     }
 
     function _getGeneratedDeltaDebt(
-        address cdpEngine,
+        address safeEngine,
         address taxCollector,
-        address cdpHandler,
+        address safeHandler,
         bytes32 collateralType,
         uint wad
     ) internal returns (int deltaDebt) {
         // Updates stability fee rate
         uint rate = TaxCollectorLike(taxCollector).taxSingle(collateralType);
 
-        // Gets COIN balance of the handler in the cdpEngine
-        uint coin = CDPEngineLike(cdpEngine).coinBalance(cdpHandler);
+        // Gets COIN balance of the handler in the safeEngine
+        uint coin = SAFEEngineLike(safeEngine).coinBalance(safeHandler);
 
-        // If there was already enough COIN in the cdpEngine balance, just exits it without adding more debt
+        // If there was already enough COIN in the safeEngine balance, just exits it without adding more debt
         if (coin < mul(wad, RAY)) {
-            // Calculates the needed deltaDebt so together with the existing coins in the cdpEngine is enough to exit wad amount of COIN tokens
+            // Calculates the needed deltaDebt so together with the existing coins in the safeEngine is enough to exit wad amount of COIN tokens
             deltaDebt = toInt(sub(mul(wad, RAY), coin) / rate);
             // This is neeeded due lack of precision. It might need to sum an extra deltaDebt wei (for the given COIN wad amount)
             deltaDebt = mul(uint(deltaDebt), rate) < mul(wad, RAY) ? deltaDebt + 1 : deltaDebt;
@@ -184,34 +184,34 @@ contract GebProxyActions is Common {
     }
 
     function _getRepaidDeltaDebt(
-        address cdpEngine,
+        address safeEngine,
         uint coin,
-        address cdp,
+        address safe,
         bytes32 collateralType
     ) internal view returns (int deltaDebt) {
-        // Gets actual rate from the cdpEngine
-        (, uint rate,,,) = CDPEngineLike(cdpEngine).collateralTypes(collateralType);
-        // Gets actual generatedDebt value of the cdp
-        (, uint generatedDebt) = CDPEngineLike(cdpEngine).cdps(collateralType, cdp);
+        // Gets actual rate from the safeEngine
+        (, uint rate,,,) = SAFEEngineLike(safeEngine).collateralTypes(collateralType);
+        // Gets actual generatedDebt value of the safe
+        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safe);
 
-        // Uses the whole coin balance in the cdpEngine to reduce the debt
+        // Uses the whole coin balance in the safeEngine to reduce the debt
         deltaDebt = toInt(coin / rate);
-        // Checks the calculated deltaDebt is not higher than cdp.generatedDebt (total debt), otherwise uses its value
+        // Checks the calculated deltaDebt is not higher than safe.generatedDebt (total debt), otherwise uses its value
         deltaDebt = uint(deltaDebt) <= generatedDebt ? - deltaDebt : - toInt(generatedDebt);
     }
 
     function _getRepaidAlDebt(
-        address cdpEngine,
+        address safeEngine,
         address usr,
-        address cdp,
+        address safe,
         bytes32 collateralType
     ) internal view returns (uint wad) {
-        // Gets actual rate from the cdpEngine
-        (, uint rate,,,) = CDPEngineLike(cdpEngine).collateralTypes(collateralType);
-        // Gets actual generatedDebt value of the cdp
-        (, uint generatedDebt) = CDPEngineLike(cdpEngine).cdps(collateralType, cdp);
-        // Gets actual coin amount in the cdp
-        uint coin = CDPEngineLike(cdpEngine).coinBalance(usr);
+        // Gets actual rate from the safeEngine
+        (, uint rate,,,) = SAFEEngineLike(safeEngine).collateralTypes(collateralType);
+        // Gets actual generatedDebt value of the safe
+        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safe);
+        // Gets actual coin amount in the safe
+        uint coin = SAFEEngineLike(safeEngine).coinBalance(usr);
 
         uint rad = sub(mul(generatedDebt, rate), coin);
         wad = rad / RAY;
@@ -225,16 +225,16 @@ contract GebProxyActions is Common {
         CollateralLike(collateral).transfer(dst, amt);
     }
 
-    function ethJoin_join(address apt, address cdp) public payable {
+    function ethJoin_join(address apt, address safe) public payable {
         // Wraps ETH in WETH
         CollateralJoinLike(apt).collateral().deposit{value: msg.value}();
         // Approves adapter to take the WETH amount
         CollateralJoinLike(apt).collateral().approve(address(apt), msg.value);
-        // Joins WETH collateral into the cdpEngine
-        CollateralJoinLike(apt).join(cdp, msg.value);
+        // Joins WETH collateral into the safeEngine
+        CollateralJoinLike(apt).join(safe, msg.value);
     }
 
-    function tokenCollateralJoin_join(address apt, address cdp, uint amt, bool transferFrom) public {
+    function tokenCollateralJoin_join(address apt, address safe, uint amt, bool transferFrom) public {
         // Only executes for tokens that have approval/transferFrom implementation
         if (transferFrom) {
             // Gets token from the user's wallet
@@ -242,44 +242,44 @@ contract GebProxyActions is Common {
             // Approves adapter to take the token amount
             CollateralJoinLike(apt).collateral().approve(apt, amt);
         }
-        // Joins token collateral into the cdpEngine
-        CollateralJoinLike(apt).join(cdp, amt);
+        // Joins token collateral into the safeEngine
+        CollateralJoinLike(apt).join(safe, amt);
     }
 
-    function approveCDPModification(
+    function approveSAFEModification(
         address obj,
         address usr
     ) public {
-        ApproveCDPModificationLike(obj).approveCDPModification(usr);
+        ApproveSAFEModificationLike(obj).approveSAFEModification(usr);
     }
 
-    function denyCDPModification(
+    function denySAFEModification(
         address obj,
         address usr
     ) public {
-        ApproveCDPModificationLike(obj).denyCDPModification(usr);
+        ApproveSAFEModificationLike(obj).denySAFEModification(usr);
     }
 
-    function openCDP(
+    function openSAFE(
         address manager,
         bytes32 collateralType,
         address usr
-    ) public returns (uint cdp) {
-        cdp = ManagerLike(manager).openCDP(collateralType, usr);
+    ) public returns (uint safe) {
+        safe = ManagerLike(manager).openSAFE(collateralType, usr);
     }
 
-    function transferCDPOwnership(
+    function transferSAFEOwnership(
         address manager,
-        uint cdp,
+        uint safe,
         address usr
     ) public {
-        ManagerLike(manager).transferCDPOwnership(cdp, usr);
+        ManagerLike(manager).transferSAFEOwnership(safe, usr);
     }
 
-    function transferCDPOwnershipToProxy(
+    function transferSAFEOwnershipToProxy(
         address proxyRegistry,
         address manager,
-        uint cdp,
+        uint safe,
         address dst
     ) public {
         // Gets actual proxy address
@@ -290,22 +290,22 @@ contract GebProxyActions is Common {
             assembly {
                 csize := extcodesize(dst)
             }
-            // We want to avoid creating a proxy for a contract address that might not be able to handle proxies, then losing the CDP
+            // We want to avoid creating a proxy for a contract address that might not be able to handle proxies, then losing the SAFE
             require(csize == 0, "dst-is-a-contract");
             // Creates the proxy for the dst address
             proxy = ProxyRegistryLike(proxyRegistry).build(dst);
         }
-        // Transfers CDP to the dst proxy
-        transferCDPOwnership(manager, cdp, proxy);
+        // Transfers SAFE to the dst proxy
+        transferSAFEOwnership(manager, safe, proxy);
     }
 
-    function allowCDP(
+    function allowSAFE(
         address manager,
-        uint cdp,
+        uint safe,
         address usr,
         uint ok
     ) public {
-        ManagerLike(manager).allowCDP(cdp, usr, ok);
+        ManagerLike(manager).allowSAFE(safe, usr, ok);
     }
 
     function allowHandler(
@@ -318,62 +318,62 @@ contract GebProxyActions is Common {
 
     function transferCollateral(
         address manager,
-        uint cdp,
+        uint safe,
         address dst,
         uint wad
     ) public {
-        ManagerLike(manager).transferCollateral(cdp, dst, wad);
+        ManagerLike(manager).transferCollateral(safe, dst, wad);
     }
 
     function transferInternalCoins(
         address manager,
-        uint cdp,
+        uint safe,
         address dst,
         uint rad
     ) public {
-        ManagerLike(manager).transferInternalCoins(cdp, dst, rad);
+        ManagerLike(manager).transferInternalCoins(safe, dst, rad);
     }
 
-    function modifyCDPCollateralization(
+    function modifySAFECollateralization(
         address manager,
-        uint cdp,
+        uint safe,
         int deltaCollateral,
         int deltaDebt
     ) public {
-        ManagerLike(manager).modifyCDPCollateralization(cdp, deltaCollateral, deltaDebt);
+        ManagerLike(manager).modifySAFECollateralization(safe, deltaCollateral, deltaDebt);
     }
 
     function quitSystem(
         address manager,
-        uint cdp,
+        uint safe,
         address dst
     ) public {
-        ManagerLike(manager).quitSystem(cdp, dst);
+        ManagerLike(manager).quitSystem(safe, dst);
     }
 
     function enterSystem(
         address manager,
         address src,
-        uint cdp
+        uint safe
     ) public {
-        ManagerLike(manager).enterSystem(src, cdp);
+        ManagerLike(manager).enterSystem(src, safe);
     }
 
-    function moveCDP(
+    function moveSAFE(
         address manager,
-        uint cdpSrc,
-        uint cdpDst
+        uint safeSrc,
+        uint safeDst
     ) public {
-        ManagerLike(manager).moveCDP(cdpSrc, cdpDst);
+        ManagerLike(manager).moveSAFE(safeSrc, safeDst);
     }
 
-    function protectCDP(
+    function protectSAFE(
         address manager,
-        uint cdp,
+        uint safe,
         address liquidationEngine,
         address saviour
     ) public {
-        ManagerLike(manager).protectCDP(cdp, liquidationEngine, saviour);
+        ManagerLike(manager).protectSAFE(safe, liquidationEngine, saviour);
     }
 
     function makeCollateralBag(
@@ -385,14 +385,14 @@ contract GebProxyActions is Common {
     function lockETH(
         address manager,
         address ethJoin,
-        uint cdp
+        uint safe
     ) public payable {
-        // Receives ETH amount, converts it to WETH and joins it into the cdpEngine
+        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
         ethJoin_join(ethJoin, address(this));
-        // Locks WETH amount into the CDP
-        CDPEngineLike(ManagerLike(manager).cdpEngine()).modifyCDPCollateralization(
-            ManagerLike(manager).collateralTypes(cdp),
-            ManagerLike(manager).cdps(cdp),
+        // Locks WETH amount into the SAFE
+        SAFEEngineLike(ManagerLike(manager).safeEngine()).modifySAFECollateralization(
+            ManagerLike(manager).collateralTypes(safe),
+            ManagerLike(manager).safes(safe),
             address(this),
             address(this),
             toInt(msg.value),
@@ -403,26 +403,26 @@ contract GebProxyActions is Common {
     function safeLockETH(
         address manager,
         address ethJoin,
-        uint cdp,
+        uint safe,
         address owner
     ) public payable {
-        require(ManagerLike(manager).ownsCDP(cdp) == owner, "owner-missmatch");
-        lockETH(manager, ethJoin, cdp);
+        require(ManagerLike(manager).ownsSAFE(safe) == owner, "owner-missmatch");
+        lockETH(manager, ethJoin, safe);
     }
 
     function lockTokenCollateral(
         address manager,
         address collateralJoin,
-        uint cdp,
+        uint safe,
         uint amt,
         bool transferFrom
     ) public {
-        // Takes token amount from user's wallet and joins into the cdpEngine
+        // Takes token amount from user's wallet and joins into the safeEngine
         tokenCollateralJoin_join(collateralJoin, address(this), amt, transferFrom);
-        // Locks token amount into the CDP
-        CDPEngineLike(ManagerLike(manager).cdpEngine()).modifyCDPCollateralization(
-            ManagerLike(manager).collateralTypes(cdp),
-            ManagerLike(manager).cdps(cdp),
+        // Locks token amount into the SAFE
+        SAFEEngineLike(ManagerLike(manager).safeEngine()).modifySAFECollateralization(
+            ManagerLike(manager).collateralTypes(safe),
+            ManagerLike(manager).safes(safe),
             address(this),
             address(this),
             toInt(convertTo18(collateralJoin, amt)),
@@ -433,25 +433,25 @@ contract GebProxyActions is Common {
     function safeLockTokenCollateral(
         address manager,
         address collateralJoin,
-        uint cdp,
+        uint safe,
         uint amt,
         bool transferFrom,
         address owner
     ) public {
-        require(ManagerLike(manager).ownsCDP(cdp) == owner, "owner-missmatch");
-        lockTokenCollateral(manager, collateralJoin, cdp, amt, transferFrom);
+        require(ManagerLike(manager).ownsSAFE(safe) == owner, "owner-missmatch");
+        lockTokenCollateral(manager, collateralJoin, safe, amt, transferFrom);
     }
 
     function freeETH(
         address manager,
         address ethJoin,
-        uint cdp,
+        uint safe,
         uint wad
     ) public {
-        // Unlocks WETH amount from the CDP
-        modifyCDPCollateralization(manager, cdp, -toInt(wad), 0);
-        // Moves the amount from the CDP handler to proxy's address
-        transferCollateral(manager, cdp, address(this), wad);
+        // Unlocks WETH amount from the SAFE
+        modifySAFECollateralization(manager, safe, -toInt(wad), 0);
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), wad);
         // Exits WETH amount to proxy address as a token
         CollateralJoinLike(ethJoin).exit(address(this), wad);
         // Converts WETH to ETH
@@ -463,14 +463,14 @@ contract GebProxyActions is Common {
     function freeTokenCollateral(
         address manager,
         address collateralJoin,
-        uint cdp,
+        uint safe,
         uint amt
     ) public {
         uint wad = convertTo18(collateralJoin, amt);
-        // Unlocks token amount from the CDP
-        modifyCDPCollateralization(manager, cdp, -toInt(wad), 0);
-        // Moves the amount from the CDP handler to proxy's address
-        transferCollateral(manager, cdp, address(this), wad);
+        // Unlocks token amount from the SAFE
+        modifySAFECollateralization(manager, safe, -toInt(wad), 0);
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), wad);
         // Exits token amount to the user's wallet as a token
         CollateralJoinLike(collateralJoin).exit(msg.sender, amt);
     }
@@ -478,11 +478,11 @@ contract GebProxyActions is Common {
     function exitETH(
         address manager,
         address ethJoin,
-        uint cdp,
+        uint safe,
         uint wad
     ) public {
-        // Moves the amount from the CDP handler to proxy's address
-        transferCollateral(manager, cdp, address(this), wad);
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), wad);
         // Exits WETH amount to proxy address as a token
         CollateralJoinLike(ethJoin).exit(address(this), wad);
         // Converts WETH to ETH
@@ -494,11 +494,11 @@ contract GebProxyActions is Common {
     function exitTokenCollateral(
         address manager,
         address collateralJoin,
-        uint cdp,
+        uint safe,
         uint amt
     ) public {
-        // Moves the amount from the CDP handler to proxy's address
-        transferCollateral(manager, cdp, address(this), convertTo18(collateralJoin, amt));
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), convertTo18(collateralJoin, amt));
 
         // Exits token amount to the user's wallet as a token
         CollateralJoinLike(collateralJoin).exit(msg.sender, amt);
@@ -508,64 +508,64 @@ contract GebProxyActions is Common {
         address manager,
         address taxCollector,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint wad
     ) public {
-        address cdpHandler = ManagerLike(manager).cdps(cdp);
-        address cdpEngine = ManagerLike(manager).cdpEngine();
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(cdp);
-        // Generates debt in the CDP
-        modifyCDPCollateralization(manager, cdp, 0, _getGeneratedDeltaDebt(cdpEngine, taxCollector, cdpHandler, collateralType, wad));
-        // Moves the COIN amount (balance in the cdpEngine in rad) to proxy's address
-        transferInternalCoins(manager, cdp, address(this), toRad(wad));
-        // Allows adapter to access to proxy's COIN balance in the cdpEngine
-        if (CDPEngineLike(cdpEngine).canModifyCDP(address(this), address(coinJoin)) == 0) {
-            CDPEngineLike(cdpEngine).approveCDPModification(coinJoin);
+        address safeHandler = ManagerLike(manager).safes(safe);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        // Generates debt in the SAFE
+        modifySAFECollateralization(manager, safe, 0, _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, wad));
+        // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
+        transferInternalCoins(manager, safe, address(this), toRad(wad));
+        // Allows adapter to access to proxy's COIN balance in the safeEngine
+        if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
+            SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
         }
         // Exits COIN to the user's wallet as a token
         CoinJoinLike(coinJoin).exit(msg.sender, wad);
     }
 
-    function generateDebtAndProtectCDP(
+    function generateDebtAndProtectSAFE(
         address manager,
         address taxCollector,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint wad,
         address liquidationEngine,
         address saviour
     ) public {
-        generateDebt(manager, taxCollector, coinJoin, cdp, wad);
-        protectCDP(manager, cdp, liquidationEngine, saviour);
+        generateDebt(manager, taxCollector, coinJoin, safe, wad);
+        protectSAFE(manager, safe, liquidationEngine, saviour);
     }
 
     function repayDebt(
         address manager,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint wad
     ) public {
-        address cdpEngine = ManagerLike(manager).cdpEngine();
-        address cdpHandler = ManagerLike(manager).cdps(cdp);
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(cdp);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        address safeHandler = ManagerLike(manager).safes(safe);
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
 
-        address own = ManagerLike(manager).ownsCDP(cdp);
-        if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
-            // Joins COIN amount into the cdpEngine
-            coinJoin_join(coinJoin, cdpHandler, wad);
-            // // Paybacks debt to the CDP
-            modifyCDPCollateralization(manager, cdp, 0, _getRepaidDeltaDebt(cdpEngine, CDPEngineLike(cdpEngine).coinBalance(cdpHandler), cdpHandler, collateralType));
+        address own = ManagerLike(manager).ownsSAFE(safe);
+        if (own == address(this) || ManagerLike(manager).safeCan(own, safe, address(this)) == 1) {
+            // Joins COIN amount into the safeEngine
+            coinJoin_join(coinJoin, safeHandler, wad);
+            // // Paybacks debt to the SAFE
+            modifySAFECollateralization(manager, safe, 0, _getRepaidDeltaDebt(safeEngine, SAFEEngineLike(safeEngine).coinBalance(safeHandler), safeHandler, collateralType));
         } else {
-             // Joins COIN amount into the cdpEngine
+             // Joins COIN amount into the safeEngine
             coinJoin_join(coinJoin, address(this), wad);
-            // Paybacks debt to the CDP
-            CDPEngineLike(cdpEngine).modifyCDPCollateralization(
+            // Paybacks debt to the SAFE
+            SAFEEngineLike(safeEngine).modifySAFECollateralization(
                 collateralType,
-                cdpHandler,
+                safeHandler,
                 address(this),
                 address(this),
                 0,
-                _getRepaidDeltaDebt(cdpEngine, wad * RAY, cdpHandler, collateralType)
+                _getRepaidDeltaDebt(safeEngine, wad * RAY, safeHandler, collateralType)
             );
         }
     }
@@ -573,37 +573,37 @@ contract GebProxyActions is Common {
     function safeRepayDebt(
         address manager,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint wad,
         address owner
     ) public {
-        require(ManagerLike(manager).ownsCDP(cdp) == owner, "owner-missmatch");
-        repayDebt(manager, coinJoin, cdp, wad);
+        require(ManagerLike(manager).ownsSAFE(safe) == owner, "owner-missmatch");
+        repayDebt(manager, coinJoin, safe, wad);
     }
 
     function repayAllDebt(
         address manager,
         address coinJoin,
-        uint cdp
+        uint safe
     ) public {
-        address cdpEngine = ManagerLike(manager).cdpEngine();
-        address cdpHandler = ManagerLike(manager).cdps(cdp);
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(cdp);
-        (, uint generatedDebt) = CDPEngineLike(cdpEngine).cdps(collateralType, cdpHandler);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        address safeHandler = ManagerLike(manager).safes(safe);
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safeHandler);
 
-        address own = ManagerLike(manager).ownsCDP(cdp);
-        if (own == address(this) || ManagerLike(manager).cdpCan(own, cdp, address(this)) == 1) {
-            // Joins COIN amount into the cdpEngine
-            coinJoin_join(coinJoin, cdpHandler, _getRepaidAlDebt(cdpEngine, cdpHandler, cdpHandler, collateralType));
-            // Paybacks debt to the CDP
-            modifyCDPCollateralization(manager, cdp, 0, -int(generatedDebt));
+        address own = ManagerLike(manager).ownsSAFE(safe);
+        if (own == address(this) || ManagerLike(manager).safeCan(own, safe, address(this)) == 1) {
+            // Joins COIN amount into the safeEngine
+            coinJoin_join(coinJoin, safeHandler, _getRepaidAlDebt(safeEngine, safeHandler, safeHandler, collateralType));
+            // Paybacks debt to the SAFE
+            modifySAFECollateralization(manager, safe, 0, -int(generatedDebt));
         } else {
-            // Joins COIN amount into the cdpEngine
-            coinJoin_join(coinJoin, address(this), _getRepaidAlDebt(cdpEngine, address(this), cdpHandler, collateralType));
-            // Paybacks debt to the CDP
-            CDPEngineLike(cdpEngine).modifyCDPCollateralization(
+            // Joins COIN amount into the safeEngine
+            coinJoin_join(coinJoin, address(this), _getRepaidAlDebt(safeEngine, address(this), safeHandler, collateralType));
+            // Paybacks debt to the SAFE
+            SAFEEngineLike(safeEngine).modifySAFECollateralization(
                 collateralType,
-                cdpHandler,
+                safeHandler,
                 address(this),
                 address(this),
                 0,
@@ -615,11 +615,11 @@ contract GebProxyActions is Common {
     function safeRepayAllDebt(
         address manager,
         address coinJoin,
-        uint cdp,
+        uint safe,
         address owner
     ) public {
-        require(ManagerLike(manager).ownsCDP(cdp) == owner, "owner-missmatch");
-        repayAllDebt(manager, coinJoin, cdp);
+        require(ManagerLike(manager).ownsSAFE(safe) == owner, "owner-missmatch");
+        repayAllDebt(manager, coinJoin, safe);
     }
 
     function lockETHAndGenerateDebt(
@@ -627,21 +627,21 @@ contract GebProxyActions is Common {
         address taxCollector,
         address ethJoin,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint deltaWad
     ) public payable {
-        address cdpHandler = ManagerLike(manager).cdps(cdp);
-        address cdpEngine = ManagerLike(manager).cdpEngine();
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(cdp);
-        // Receives ETH amount, converts it to WETH and joins it into the cdpEngine
-        ethJoin_join(ethJoin, cdpHandler);
-        // Locks WETH amount into the CDP and generates debt
-        modifyCDPCollateralization(manager, cdp, toInt(msg.value), _getGeneratedDeltaDebt(cdpEngine, taxCollector, cdpHandler, collateralType, deltaWad));
-        // Moves the COIN amount (balance in the cdpEngine in rad) to proxy's address
-        transferInternalCoins(manager, cdp, address(this), toRad(deltaWad));
-        // Allows adapter to access to proxy's COIN balance in the cdpEngine
-        if (CDPEngineLike(cdpEngine).canModifyCDP(address(this), address(coinJoin)) == 0) {
-            CDPEngineLike(cdpEngine).approveCDPModification(coinJoin);
+        address safeHandler = ManagerLike(manager).safes(safe);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
+        ethJoin_join(ethJoin, safeHandler);
+        // Locks WETH amount into the SAFE and generates debt
+        modifySAFECollateralization(manager, safe, toInt(msg.value), _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, deltaWad));
+        // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
+        transferInternalCoins(manager, safe, address(this), toRad(deltaWad));
+        // Allows adapter to access to proxy's COIN balance in the safeEngine
+        if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
+            SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
         }
         // Exits COIN to the user's wallet as a token
         CoinJoinLike(coinJoin).exit(msg.sender, deltaWad);
@@ -654,12 +654,12 @@ contract GebProxyActions is Common {
         address coinJoin,
         bytes32 collateralType,
         uint deltaWad
-    ) public payable returns (uint cdp) {
-        cdp = openCDP(manager, collateralType, address(this));
-        lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, cdp, deltaWad);
+    ) public payable returns (uint safe) {
+        safe = openSAFE(manager, collateralType, address(this));
+        lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, safe, deltaWad);
     }
 
-    function openLockETHGenerateDebtAndProtectCDP(
+    function openLockETHGenerateDebtAndProtectSAFE(
         address manager,
         address taxCollector,
         address ethJoin,
@@ -668,10 +668,10 @@ contract GebProxyActions is Common {
         uint deltaWad,
         address liquidationEngine,
         address saviour
-    ) public payable returns (uint cdp) {
-        cdp = openCDP(manager, collateralType, address(this));
-        lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, cdp, deltaWad);
-        protectCDP(manager, cdp, liquidationEngine, saviour);
+    ) public payable returns (uint safe) {
+        safe = openSAFE(manager, collateralType, address(this));
+        lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, safe, deltaWad);
+        protectSAFE(manager, safe, liquidationEngine, saviour);
     }
 
     function lockTokenCollateralAndGenerateDebt(
@@ -679,34 +679,34 @@ contract GebProxyActions is Common {
         address taxCollector,
         address collateralJoin,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint collateralAmount,
         uint deltaWad,
         bool transferFrom
     ) public {
-        address cdpHandler = ManagerLike(manager).cdps(cdp);
-        address cdpEngine = ManagerLike(manager).cdpEngine();
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(cdp);
-        // Takes token amount from user's wallet and joins into the cdpEngine
-        tokenCollateralJoin_join(collateralJoin, cdpHandler, collateralAmount, transferFrom);
-        // Locks token amount into the CDP and generates debt
-        modifyCDPCollateralization(manager, cdp, toInt(convertTo18(collateralJoin, collateralAmount)), _getGeneratedDeltaDebt(cdpEngine, taxCollector, cdpHandler, collateralType, deltaWad));
-        // Moves the COIN amount (balance in the cdpEngine in rad) to proxy's address
-        transferInternalCoins(manager, cdp, address(this), toRad(deltaWad));
-        // Allows adapter to access to proxy's COIN balance in the cdpEngine
-        if (CDPEngineLike(cdpEngine).canModifyCDP(address(this), address(coinJoin)) == 0) {
-            CDPEngineLike(cdpEngine).approveCDPModification(coinJoin);
+        address safeHandler = ManagerLike(manager).safes(safe);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        // Takes token amount from user's wallet and joins into the safeEngine
+        tokenCollateralJoin_join(collateralJoin, safeHandler, collateralAmount, transferFrom);
+        // Locks token amount into the SAFE and generates debt
+        modifySAFECollateralization(manager, safe, toInt(convertTo18(collateralJoin, collateralAmount)), _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, deltaWad));
+        // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
+        transferInternalCoins(manager, safe, address(this), toRad(deltaWad));
+        // Allows adapter to access to proxy's COIN balance in the safeEngine
+        if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
+            SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
         }
         // Exits COIN to the user's wallet as a token
         CoinJoinLike(coinJoin).exit(msg.sender, deltaWad);
     }
 
-    function lockTokenCollateralGenerateDebtAndProtectCDP(
+    function lockTokenCollateralGenerateDebtAndProtectSAFE(
         address manager,
         address taxCollector,
         address collateralJoin,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint collateralAmount,
         uint deltaWad,
         bool transferFrom,
@@ -718,12 +718,12 @@ contract GebProxyActions is Common {
           taxCollector,
           collateralJoin,
           coinJoin,
-          cdp,
+          safe,
           collateralAmount,
           deltaWad,
           transferFrom
         );
-        protectCDP(manager, cdp, liquidationEngine, saviour);
+        protectSAFE(manager, safe, liquidationEngine, saviour);
     }
 
     function openLockTokenCollateralAndGenerateDebt(
@@ -735,12 +735,12 @@ contract GebProxyActions is Common {
         uint collateralAmount,
         uint deltaWad,
         bool transferFrom
-    ) public returns (uint cdp) {
-        cdp = openCDP(manager, collateralType, address(this));
-        lockTokenCollateralAndGenerateDebt(manager, taxCollector, collateralJoin, coinJoin, cdp, collateralAmount, deltaWad, transferFrom);
+    ) public returns (uint safe) {
+        safe = openSAFE(manager, collateralType, address(this));
+        lockTokenCollateralAndGenerateDebt(manager, taxCollector, collateralJoin, coinJoin, safe, collateralAmount, deltaWad, transferFrom);
     }
 
-    function openLockTokenCollateralGenerateDebtAndProtectCDP(
+    function openLockTokenCollateralGenerateDebtAndProtectSAFE(
         address manager,
         address taxCollector,
         address collateralJoin,
@@ -751,10 +751,10 @@ contract GebProxyActions is Common {
         bool transferFrom,
         address liquidationEngine,
         address saviour
-    ) public returns (uint cdp) {
-        cdp = openCDP(manager, collateralType, address(this));
-        lockTokenCollateralAndGenerateDebt(manager, taxCollector, collateralJoin, coinJoin, cdp, collateralAmount, deltaWad, transferFrom);
-        protectCDP(manager, cdp, liquidationEngine, saviour);
+    ) public returns (uint safe) {
+        safe = openSAFE(manager, collateralType, address(this));
+        lockTokenCollateralAndGenerateDebt(manager, taxCollector, collateralJoin, coinJoin, safe, collateralAmount, deltaWad, transferFrom);
+        protectSAFE(manager, safe, liquidationEngine, saviour);
     }
 
     function openLockGNTAndGenerateDebt(
@@ -765,7 +765,7 @@ contract GebProxyActions is Common {
         bytes32 collateralType,
         uint collateralAmount,
         uint deltaWad
-    ) public returns (address bag, uint cdp) {
+    ) public returns (address bag, uint safe) {
         // Creates bag (if doesn't exist) to hold GNT
         bag = GNTJoinLike(gntJoin).bags(address(this));
         if (bag == address(0)) {
@@ -773,10 +773,10 @@ contract GebProxyActions is Common {
         }
         // Transfer funds to the funds which previously were sent to the proxy
         CollateralLike(CollateralJoinLike(gntJoin).collateral()).transfer(bag, collateralAmount);
-        cdp = openLockTokenCollateralAndGenerateDebt(manager, taxCollector, gntJoin, coinJoin, collateralType, collateralAmount, deltaWad, false);
+        safe = openLockTokenCollateralAndGenerateDebt(manager, taxCollector, gntJoin, coinJoin, collateralType, collateralAmount, deltaWad, false);
     }
 
-    function openLockGNTGenerateDebtAndProtectCDP(
+    function openLockGNTGenerateDebtAndProtectSAFE(
         address manager,
         address taxCollector,
         address gntJoin,
@@ -786,7 +786,7 @@ contract GebProxyActions is Common {
         uint deltaWad,
         address liquidationEngine,
         address saviour
-    ) public returns (address bag, uint cdp) {
+    ) public returns (address bag, uint safe) {
         // Creates bag (if doesn't exist) to hold GNT
         bag = GNTJoinLike(gntJoin).bags(address(this));
         if (bag == address(0)) {
@@ -794,30 +794,30 @@ contract GebProxyActions is Common {
         }
         // Transfer funds to the funds which previously were sent to the proxy
         CollateralLike(CollateralJoinLike(gntJoin).collateral()).transfer(bag, collateralAmount);
-        cdp = openLockTokenCollateralAndGenerateDebt(manager, taxCollector, gntJoin, coinJoin, collateralType, collateralAmount, deltaWad, false);
-        protectCDP(manager, cdp, liquidationEngine, saviour);
+        safe = openLockTokenCollateralAndGenerateDebt(manager, taxCollector, gntJoin, coinJoin, collateralType, collateralAmount, deltaWad, false);
+        protectSAFE(manager, safe, liquidationEngine, saviour);
     }
 
     function repayDebtAndFreeETH(
         address manager,
         address ethJoin,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint collateralWad,
         uint deltaWad
     ) public {
-        address cdpHandler = ManagerLike(manager).cdps(cdp);
-        // Joins COIN amount into the cdpEngine
-        coinJoin_join(coinJoin, cdpHandler, deltaWad);
-        // Paybacks debt to the CDP and unlocks WETH amount from it
-        modifyCDPCollateralization(
+        address safeHandler = ManagerLike(manager).safes(safe);
+        // Joins COIN amount into the safeEngine
+        coinJoin_join(coinJoin, safeHandler, deltaWad);
+        // Paybacks debt to the SAFE and unlocks WETH amount from it
+        modifySAFECollateralization(
             manager,
-            cdp,
+            safe,
             -toInt(collateralWad),
-            _getRepaidDeltaDebt(ManagerLike(manager).cdpEngine(), CDPEngineLike(ManagerLike(manager).cdpEngine()).coinBalance(cdpHandler), cdpHandler, ManagerLike(manager).collateralTypes(cdp))
+            _getRepaidDeltaDebt(ManagerLike(manager).safeEngine(), SAFEEngineLike(ManagerLike(manager).safeEngine()).coinBalance(safeHandler), safeHandler, ManagerLike(manager).collateralTypes(safe))
         );
-        // Moves the amount from the CDP handler to proxy's address
-        transferCollateral(manager, cdp, address(this), collateralWad);
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), collateralWad);
         // Exits WETH amount to proxy address as a token
         CollateralJoinLike(ethJoin).exit(address(this), collateralWad);
         // Converts WETH to ETH
@@ -830,25 +830,25 @@ contract GebProxyActions is Common {
         address manager,
         address ethJoin,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint collateralWad
     ) public {
-        address cdpEngine = ManagerLike(manager).cdpEngine();
-        address cdpHandler = ManagerLike(manager).cdps(cdp);
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(cdp);
-        (, uint generatedDebt) = CDPEngineLike(cdpEngine).cdps(collateralType, cdpHandler);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        address safeHandler = ManagerLike(manager).safes(safe);
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safeHandler);
 
-        // Joins COIN amount into the cdpEngine
-        coinJoin_join(coinJoin, cdpHandler, _getRepaidAlDebt(cdpEngine, cdpHandler, cdpHandler, collateralType));
-        // Paybacks debt to the CDP and unlocks WETH amount from it
-        modifyCDPCollateralization(
+        // Joins COIN amount into the safeEngine
+        coinJoin_join(coinJoin, safeHandler, _getRepaidAlDebt(safeEngine, safeHandler, safeHandler, collateralType));
+        // Paybacks debt to the SAFE and unlocks WETH amount from it
+        modifySAFECollateralization(
             manager,
-            cdp,
+            safe,
             -toInt(collateralWad),
             -int(generatedDebt)
         );
-        // Moves the amount from the CDP handler to proxy's address
-        transferCollateral(manager, cdp, address(this), collateralWad);
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), collateralWad);
         // Exits WETH amount to proxy address as a token
         CollateralJoinLike(ethJoin).exit(address(this), collateralWad);
         // Converts WETH to ETH
@@ -861,23 +861,23 @@ contract GebProxyActions is Common {
         address manager,
         address collateralJoin,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint collateralAmount,
         uint deltaWad
     ) public {
-        address cdpHandler = ManagerLike(manager).cdps(cdp);
-        // Joins COIN amount into the cdpEngine
-        coinJoin_join(coinJoin, cdpHandler, deltaWad);
+        address safeHandler = ManagerLike(manager).safes(safe);
+        // Joins COIN amount into the safeEngine
+        coinJoin_join(coinJoin, safeHandler, deltaWad);
         uint collateralWad = convertTo18(collateralJoin, collateralAmount);
-        // Paybacks debt to the CDP and unlocks token amount from it
-        modifyCDPCollateralization(
+        // Paybacks debt to the SAFE and unlocks token amount from it
+        modifySAFECollateralization(
             manager,
-            cdp,
+            safe,
             -toInt(collateralWad),
-            _getRepaidDeltaDebt(ManagerLike(manager).cdpEngine(), CDPEngineLike(ManagerLike(manager).cdpEngine()).coinBalance(cdpHandler), cdpHandler, ManagerLike(manager).collateralTypes(cdp))
+            _getRepaidDeltaDebt(ManagerLike(manager).safeEngine(), SAFEEngineLike(ManagerLike(manager).safeEngine()).coinBalance(safeHandler), safeHandler, ManagerLike(manager).collateralTypes(safe))
         );
-        // Moves the amount from the CDP handler to proxy's address
-        transferCollateral(manager, cdp, address(this), collateralWad);
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), collateralWad);
         // Exits token amount to the user's wallet as a token
         CollateralJoinLike(collateralJoin).exit(msg.sender, collateralAmount);
     }
@@ -886,26 +886,26 @@ contract GebProxyActions is Common {
         address manager,
         address collateralJoin,
         address coinJoin,
-        uint cdp,
+        uint safe,
         uint collateralAmount
     ) public {
-        address cdpEngine = ManagerLike(manager).cdpEngine();
-        address cdpHandler = ManagerLike(manager).cdps(cdp);
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(cdp);
-        (, uint generatedDebt) = CDPEngineLike(cdpEngine).cdps(collateralType, cdpHandler);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        address safeHandler = ManagerLike(manager).safes(safe);
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safeHandler);
 
-        // Joins COIN amount into the cdpEngine
-        coinJoin_join(coinJoin, cdpHandler, _getRepaidAlDebt(cdpEngine, cdpHandler, cdpHandler, collateralType));
+        // Joins COIN amount into the safeEngine
+        coinJoin_join(coinJoin, safeHandler, _getRepaidAlDebt(safeEngine, safeHandler, safeHandler, collateralType));
         uint collateralWad = convertTo18(collateralJoin, collateralAmount);
-        // Paybacks debt to the CDP and unlocks token amount from it
-        modifyCDPCollateralization(
+        // Paybacks debt to the SAFE and unlocks token amount from it
+        modifySAFECollateralization(
             manager,
-            cdp,
+            safe,
             -toInt(collateralWad),
             -int(generatedDebt)
         );
-        // Moves the amount from the CDP handler to proxy's address
-        transferCollateral(manager, cdp, address(this), collateralWad);
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), collateralWad);
         // Exits token amount to the user's wallet as a token
         CollateralJoinLike(collateralJoin).exit(msg.sender, collateralAmount);
     }
@@ -916,26 +916,26 @@ contract GebProxyActionsGlobalSettlement is Common {
     function _freeCollateral(
         address manager,
         address globalSettlement,
-        uint cdp
+        uint safe
     ) internal returns (uint lockedCollateral) {
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(cdp);
-        address cdpHandler = ManagerLike(manager).cdps(cdp);
-        CDPEngineLike cdpEngine = CDPEngineLike(ManagerLike(manager).cdpEngine());
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        address safeHandler = ManagerLike(manager).safes(safe);
+        SAFEEngineLike safeEngine = SAFEEngineLike(ManagerLike(manager).safeEngine());
         uint generatedDebt;
-        (lockedCollateral, generatedDebt) = cdpEngine.cdps(collateralType, cdpHandler);
+        (lockedCollateral, generatedDebt) = safeEngine.safes(collateralType, safeHandler);
 
-        // If CDP still has debt, it needs to be paid
+        // If SAFE still has debt, it needs to be paid
         if (generatedDebt > 0) {
-            GlobalSettlementLike(globalSettlement).processCDP(collateralType, cdpHandler);
-            (lockedCollateral,) = cdpEngine.cdps(collateralType, cdpHandler);
+            GlobalSettlementLike(globalSettlement).processSAFE(collateralType, safeHandler);
+            (lockedCollateral,) = safeEngine.safes(collateralType, safeHandler);
         }
-        // Approves the manager to transfer the position to proxy's address in the cdpEngine
-        if (cdpEngine.canModifyCDP(address(this), address(manager)) == 0) {
-            cdpEngine.approveCDPModification(manager);
+        // Approves the manager to transfer the position to proxy's address in the safeEngine
+        if (safeEngine.canModifySAFE(address(this), address(manager)) == 0) {
+            safeEngine.approveSAFEModification(manager);
         }
-        // Transfers position from CDP to the proxy address
-        ManagerLike(manager).quitSystem(cdp, address(this));
-        // Frees the position and recovers the collateral in the cdpEngine registry
+        // Transfers position from SAFE to the proxy address
+        ManagerLike(manager).quitSystem(safe, address(this));
+        // Frees the position and recovers the collateral in the safeEngine registry
         GlobalSettlementLike(globalSettlement).freeCollateral(collateralType);
     }
 
@@ -944,9 +944,9 @@ contract GebProxyActionsGlobalSettlement is Common {
         address manager,
         address ethJoin,
         address globalSettlement,
-        uint cdp
+        uint safe
     ) public {
-        uint wad = _freeCollateral(manager, globalSettlement, cdp);
+        uint wad = _freeCollateral(manager, globalSettlement, safe);
         // Exits WETH amount to proxy address as a token
         CollateralJoinLike(ethJoin).exit(address(this), wad);
         // Converts WETH to ETH
@@ -959,9 +959,9 @@ contract GebProxyActionsGlobalSettlement is Common {
         address manager,
         address collateralJoin,
         address globalSettlement,
-        uint cdp
+        uint safe
     ) public {
-        uint amt = _freeCollateral(manager, globalSettlement, cdp) / 10 ** (18 - CollateralJoinLike(collateralJoin).decimals());
+        uint amt = _freeCollateral(manager, globalSettlement, safe) / 10 ** (18 - CollateralJoinLike(collateralJoin).decimals());
         // Exits token amount to the user's wallet as a token
         CollateralJoinLike(collateralJoin).exit(msg.sender, amt);
     }
@@ -972,10 +972,10 @@ contract GebProxyActionsGlobalSettlement is Common {
         uint wad
     ) public {
         coinJoin_join(coinJoin, address(this), wad);
-        CDPEngineLike cdpEngine = CoinJoinLike(coinJoin).cdpEngine();
-        // Approves the globalSettlement to take out COIN from the proxy's balance in the cdpEngine
-        if (cdpEngine.canModifyCDP(address(this), address(globalSettlement)) == 0) {
-            cdpEngine.approveCDPModification(globalSettlement);
+        SAFEEngineLike safeEngine = CoinJoinLike(coinJoin).safeEngine();
+        // Approves the globalSettlement to take out COIN from the proxy's balance in the safeEngine
+        if (safeEngine.canModifySAFE(address(this), address(globalSettlement)) == 0) {
+            safeEngine.approveSAFEModification(globalSettlement);
         }
         GlobalSettlementLike(globalSettlement).prepareCoinsForRedeeming(wad);
     }
@@ -1015,14 +1015,14 @@ contract GebProxyActionsCoinSavingsAccount is Common {
         address coinSavingsAccount,
         uint wad
     ) public {
-        CDPEngineLike cdpEngine = CoinJoinLike(coinJoin).cdpEngine();
+        SAFEEngineLike safeEngine = CoinJoinLike(coinJoin).safeEngine();
         // Executes updateAccumulatedRate to get the accumulatedRates updated to latestUpdateTime == now, otherwise join will fail
         uint accumulatedRates = CoinSavingsAccountLike(coinSavingsAccount).updateAccumulatedRate();
-        // Joins wad amount to the cdpEngine balance
+        // Joins wad amount to the safeEngine balance
         coinJoin_join(coinJoin, address(this), wad);
-        // Approves the coinSavingsAccount to take out COIN from the proxy's balance in the cdpEngine
-        if (cdpEngine.canModifyCDP(address(this), address(coinSavingsAccount)) == 0) {
-            cdpEngine.approveCDPModification(coinSavingsAccount);
+        // Approves the coinSavingsAccount to take out COIN from the proxy's balance in the safeEngine
+        if (safeEngine.canModifySAFE(address(this), address(coinSavingsAccount)) == 0) {
+            safeEngine.approveSAFEModification(coinSavingsAccount);
         }
         // Joins the savings value (equivalent to the COIN wad amount) in the coinSavingsAccount
         CoinSavingsAccountLike(coinSavingsAccount).deposit(mul(wad, RAY) / accumulatedRates);
@@ -1033,21 +1033,21 @@ contract GebProxyActionsCoinSavingsAccount is Common {
         address coinSavingsAccount,
         uint wad
     ) public {
-        CDPEngineLike cdpEngine = CoinJoinLike(coinJoin).cdpEngine();
+        SAFEEngineLike safeEngine = CoinJoinLike(coinJoin).safeEngine();
         // Executes updateAccumulatedRate to count the savings accumulated until this moment
         uint accumulatedRates = CoinSavingsAccountLike(coinSavingsAccount).updateAccumulatedRate();
         // Calculates the savings value in the coinSavingsAccount equivalent to the COIN wad amount
         uint savings = mul(wad, RAY) / accumulatedRates;
         // Exits COIN from the coinSavingsAccount
         CoinSavingsAccountLike(coinSavingsAccount).withdraw(savings);
-        // Checks the actual balance of COIN in the cdpEngine after the coinSavingsAccount exit
-        uint bal = CoinJoinLike(coinJoin).cdpEngine().coinBalance(address(this));
-        // Allows adapter to access to proxy's COIN balance in the cdpEngine
-        if (cdpEngine.canModifyCDP(address(this), address(coinJoin)) == 0) {
-            cdpEngine.approveCDPModification(coinJoin);
+        // Checks the actual balance of COIN in the safeEngine after the coinSavingsAccount exit
+        uint bal = CoinJoinLike(coinJoin).safeEngine().coinBalance(address(this));
+        // Allows adapter to access to proxy's COIN balance in the safeEngine
+        if (safeEngine.canModifySAFE(address(this), address(coinJoin)) == 0) {
+            safeEngine.approveSAFEModification(coinJoin);
         }
         // It is necessary to check if due rounding the exact wad amount can be exited by the adapter.
-        // Otherwise it will do the maximum COIN balance in the cdpEngine
+        // Otherwise it will do the maximum COIN balance in the safeEngine
         CoinJoinLike(coinJoin).exit(
             msg.sender,
             bal >= mul(wad, RAY) ? wad : bal / RAY
@@ -1058,16 +1058,16 @@ contract GebProxyActionsCoinSavingsAccount is Common {
         address coinJoin,
         address coinSavingsAccount
     ) public {
-        CDPEngineLike cdpEngine = CoinJoinLike(coinJoin).cdpEngine();
+        SAFEEngineLike safeEngine = CoinJoinLike(coinJoin).safeEngine();
         // Executes updateAccumulatedRate to count the savings accumulated until this moment
         uint accumulatedRates = CoinSavingsAccountLike(coinSavingsAccount).updateAccumulatedRate();
         // Gets the total savings belonging to the proxy address
         uint savings = CoinSavingsAccountLike(coinSavingsAccount).savings(address(this));
         // Exits COIN from the coinSavingsAccount
         CoinSavingsAccountLike(coinSavingsAccount).withdraw(savings);
-        // Allows adapter to access to proxy's COIN balance in the cdpEngine
-        if (cdpEngine.canModifyCDP(address(this), address(coinJoin)) == 0) {
-            cdpEngine.approveCDPModification(coinJoin);
+        // Allows adapter to access to proxy's COIN balance in the safeEngine
+        if (safeEngine.canModifySAFE(address(this), address(coinJoin)) == 0) {
+            safeEngine.approveSAFEModification(coinJoin);
         }
         // Exits the COIN amount corresponding to the value of savings
         CoinJoinLike(coinJoin).exit(msg.sender, mul(accumulatedRates, savings) / RAY);
