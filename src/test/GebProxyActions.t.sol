@@ -282,7 +282,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         dgd = new DGD(1000 * 10 ** 9);
         dgdJoin = new CollateralJoin3(address(safeEngine), "DGD", address(dgd), 9);
         orclDGD = new DSValue();
-        gebDeploy.deployCollateral(bytes32("ENGLISH"), "DGD", address(dgdJoin), address(orclDGD), address(orclDGD), address(0), 1);
+        gebDeploy.deployCollateral(bytes32("ENGLISH"), "DGD", address(dgdJoin), address(orclDGD), address(orclDGD), address(0));
         (dgdEnglishCollateralAuctionHouse, ,) = gebDeploy.collateralTypes("DGD");
         orclDGD.updateResult(uint(50 ether)); // Price 50 COIN = 1 DGD (in precision 18)
         this.modifyParameters(address(oracleRelayer), "DGD", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
@@ -296,7 +296,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         gnt = new GNT(1000000 ether);
         gntCollateralJoin = new CollateralJoin4(address(safeEngine), "GNT", address(gnt));
         orclGNT = new DSValue();
-        gebDeploy.deployCollateral(bytes32("ENGLISH"), "GNT", address(gntCollateralJoin), address(orclGNT), address(orclGNT), address(0), 0);
+        gebDeploy.deployCollateral(bytes32("ENGLISH"), "GNT", address(gntCollateralJoin), address(orclGNT), address(orclGNT), address(0));
         orclGNT.updateResult(uint(100 ether)); // Price 100 COIN = 1 GNT
         this.modifyParameters(address(oracleRelayer), "GNT", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
         this.modifyParameters(address(oracleRelayer), "GNT", "liquidationCRatio", uint(1500000000 ether)); // Liquidation ratio 150%
