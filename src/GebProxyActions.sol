@@ -120,8 +120,7 @@ contract Common {
     uint256 constant RAY = 10 ** 27;
 
     // Internal functions
-
-    function mul(uint x, uint y) internal pure returns (uint z) {
+    function multiply(uint x, uint y) internal pure returns (uint z) {
         require(y == 0 || (z = x * y) / y == x, "mul-overflow");
     }
 
@@ -139,7 +138,7 @@ contract Common {
 contract GebProxyActions is Common {
     // Internal functions
 
-    function sub(uint x, uint y) internal pure returns (uint z) {
+    function subtract(uint x, uint y) internal pure returns (uint z) {
         require((z = x - y) <= x, "sub-overflow");
     }
 
@@ -149,7 +148,7 @@ contract GebProxyActions is Common {
     }
 
     function toRad(uint wad) internal pure returns (uint rad) {
-        rad = mul(wad, 10 ** 27);
+        rad = multiply(wad, 10 ** 27);
     }
 
     function convertTo18(address collateralJoin, uint256 amt) internal returns (uint256 wad) {
@@ -158,7 +157,7 @@ contract GebProxyActions is Common {
         uint decimals = CollateralJoinLike(collateralJoin).decimals();
         wad = amt;
         if (decimals < 18) {
-          wad = mul(
+          wad = multiply(
               amt,
               10 ** (18 - decimals)
           );
@@ -179,11 +178,11 @@ contract GebProxyActions is Common {
         uint coin = SAFEEngineLike(safeEngine).coinBalance(safeHandler);
 
         // If there was already enough COIN in the safeEngine balance, just exits it without adding more debt
-        if (coin < mul(wad, RAY)) {
+        if (coin < multiply(wad, RAY)) {
             // Calculates the needed deltaDebt so together with the existing coins in the safeEngine is enough to exit wad amount of COIN tokens
-            deltaDebt = toInt(sub(mul(wad, RAY), coin) / rate);
+            deltaDebt = toInt(subtract(multiply(wad, RAY), coin) / rate);
             // This is neeeded due lack of precision. It might need to sum an extra deltaDebt wei (for the given COIN wad amount)
-            deltaDebt = mul(uint(deltaDebt), rate) < mul(wad, RAY) ? deltaDebt + 1 : deltaDebt;
+            deltaDebt = multiply(uint(deltaDebt), rate) < multiply(wad, RAY) ? deltaDebt + 1 : deltaDebt;
         }
     }
 
@@ -217,11 +216,11 @@ contract GebProxyActions is Common {
         // Gets actual coin amount in the safe
         uint coin = SAFEEngineLike(safeEngine).coinBalance(usr);
 
-        uint rad = sub(mul(generatedDebt, rate), coin);
+        uint rad = subtract(multiply(generatedDebt, rate), coin);
         wad = rad / RAY;
 
         // If the rad precision has some dust, it will need to request for 1 extra wad wei
-        wad = mul(wad, RAY) < rad ? wad + 1 : wad;
+        wad = multiply(wad, RAY) < rad ? wad + 1 : wad;
     }
 
     // Public functions
@@ -991,7 +990,7 @@ contract GebProxyActionsGlobalSettlement is Common {
         uint wad
     ) public {
         GlobalSettlementLike(globalSettlement).redeemCollateral(collateralType, wad);
-        uint collateralWad = mul(wad, GlobalSettlementLike(globalSettlement).collateralCashPrice(collateralType)) / RAY;
+        uint collateralWad = multiply(wad, GlobalSettlementLike(globalSettlement).collateralCashPrice(collateralType)) / RAY;
         // Exits WETH amount to proxy address as a token
         CollateralJoinLike(ethJoin).exit(address(this), collateralWad);
         // Converts WETH to ETH
@@ -1008,7 +1007,7 @@ contract GebProxyActionsGlobalSettlement is Common {
     ) public {
         GlobalSettlementLike(globalSettlement).redeemCollateral(collateralType, wad);
         // Exits token amount to the user's wallet as a token
-        uint amt = mul(wad, GlobalSettlementLike(globalSettlement).collateralCashPrice(collateralType)) / RAY / 10 ** (18 - CollateralJoinLike(collateralJoin).decimals());
+        uint amt = multiply(wad, GlobalSettlementLike(globalSettlement).collateralCashPrice(collateralType)) / RAY / 10 ** (18 - CollateralJoinLike(collateralJoin).decimals());
         CollateralJoinLike(collateralJoin).exit(msg.sender, amt);
     }
 }
@@ -1029,7 +1028,7 @@ contract GebProxyActionsCoinSavingsAccount is Common {
             safeEngine.approveSAFEModification(coinSavingsAccount);
         }
         // Joins the savings value (equivalent to the COIN wad amount) in the coinSavingsAccount
-        CoinSavingsAccountLike(coinSavingsAccount).deposit(mul(wad, RAY) / accumulatedRates);
+        CoinSavingsAccountLike(coinSavingsAccount).deposit(multiply(wad, RAY) / accumulatedRates);
     }
 
     function withdraw(
@@ -1041,7 +1040,7 @@ contract GebProxyActionsCoinSavingsAccount is Common {
         // Executes updateAccumulatedRate to count the savings accumulated until this moment
         uint accumulatedRates = CoinSavingsAccountLike(coinSavingsAccount).updateAccumulatedRate();
         // Calculates the savings value in the coinSavingsAccount equivalent to the COIN wad amount
-        uint savings = mul(wad, RAY) / accumulatedRates;
+        uint savings = multiply(wad, RAY) / accumulatedRates;
         // Exits COIN from the coinSavingsAccount
         CoinSavingsAccountLike(coinSavingsAccount).withdraw(savings);
         // Checks the actual balance of COIN in the safeEngine after the coinSavingsAccount exit
@@ -1054,7 +1053,7 @@ contract GebProxyActionsCoinSavingsAccount is Common {
         // Otherwise it will do the maximum COIN balance in the safeEngine
         CoinJoinLike(coinJoin).exit(
             msg.sender,
-            bal >= mul(wad, RAY) ? wad : bal / RAY
+            bal >= multiply(wad, RAY) ? wad : bal / RAY
         );
     }
 
@@ -1074,6 +1073,6 @@ contract GebProxyActionsCoinSavingsAccount is Common {
             safeEngine.approveSAFEModification(coinJoin);
         }
         // Exits the COIN amount corresponding to the value of savings
-        CoinJoinLike(coinJoin).exit(msg.sender, mul(accumulatedRates, savings) / RAY);
+        CoinJoinLike(coinJoin).exit(msg.sender, multiply(accumulatedRates, savings) / RAY);
     }
 }
