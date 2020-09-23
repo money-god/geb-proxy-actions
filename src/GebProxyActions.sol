@@ -153,12 +153,16 @@ contract GebProxyActions is Common {
     }
 
     function convertTo18(address collateralJoin, uint256 amt) internal returns (uint256 wad) {
-        // For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to frob function
+        // For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
         // Adapters will automatically handle the difference of precision
-        wad = mul(
-            amt,
-            10 ** (18 - CollateralJoinLike(collateralJoin).decimals())
-        );
+        uint decimals = CollateralJoinLike(collateralJoin).decimals();
+        wad = amt;
+        if (decimals < 18) {
+          wad = mul(
+              amt,
+              10 ** (18 - decimals)
+          );
+        }
     }
 
     function _getGeneratedDeltaDebt(
