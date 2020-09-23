@@ -790,14 +790,15 @@ contract GebProxyActions is Common {
         address liquidationEngine,
         address saviour
     ) public returns (address bag, uint safe) {
-        // Creates bag (if doesn't exist) to hold GNT
-        bag = GNTJoinLike(gntJoin).bags(address(this));
-        if (bag == address(0)) {
-            bag = makeCollateralBag(gntJoin);
-        }
-        // Transfer funds to the funds which previously were sent to the proxy
-        CollateralLike(CollateralJoinLike(gntJoin).collateral()).transfer(bag, collateralAmount);
-        safe = openLockTokenCollateralAndGenerateDebt(manager, taxCollector, gntJoin, coinJoin, collateralType, collateralAmount, deltaWad, false);
+        (bag, safe) = openLockGNTAndGenerateDebt(
+          manager,
+          taxCollector,
+          gntJoin,
+          coinJoin,
+          collateralType,
+          collateralAmount,
+          deltaWad
+        );
         protectSAFE(manager, safe, liquidationEngine, saviour);
     }
 
