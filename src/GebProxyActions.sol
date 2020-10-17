@@ -1051,7 +1051,7 @@ contract GebProxyActionsCoinSavingsAccount is Common {
             safeEngine.approveSAFEModification(coinJoin);
         }
         // It is necessary to check if due rounding the exact wad amount can be exited by the adapter.
-        // Otherwise it will do the maximum COIN balance in the safeEngine
+        // Otherwise it will do the minimum COIN balance in the safeEngine
         CoinJoinLike(coinJoin).exit(
             msg.sender,
             bal >= multiply(wad, RAY) ? wad : bal / RAY
