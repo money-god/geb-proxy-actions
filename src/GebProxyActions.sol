@@ -17,6 +17,9 @@
 
 pragma solidity ^0.6.7;
 
+import "./uni/interfaces/IUniswapV2Router02.sol";
+import "./uni/interfaces/IUniswapV2Factory.sol";
+
 abstract contract CollateralLike {
     function approve(address, uint) virtual public;
     function transfer(address, uint) virtual public;
@@ -67,6 +70,7 @@ abstract contract GNTJoinLike {
 }
 
 abstract contract DSTokenLike {
+    function balanceOf(address) virtual public view returns (uint);
     function approve(address, uint) virtual public;
     function transfer(address, uint) virtual public;
     function transferFrom(address, address, uint) virtual public;
@@ -106,6 +110,12 @@ abstract contract CoinSavingsAccountLike {
 abstract contract ProxyRegistryLike {
     function proxies(address) virtual public view returns (address);
     function build(address) virtual public returns (address);
+}
+
+abstract contract GebIncentivesLike {
+    function stake(uint256 amount) virtual public;
+    function withdraw(uint256 amount) virtual public;
+    function exit() virtual public;
 }
 
 abstract contract ProxyLike {
@@ -1075,5 +1085,588 @@ contract GebProxyActionsCoinSavingsAccount is Common {
         }
         // Exits the COIN amount corresponding to the value of savings
         CoinJoinLike(coinJoin).exit(msg.sender, multiply(accumulatedRates, savings) / RAY);
+    }
+}
+
+contract GebProxyIncentivesActions is Common {
+    // Internal functions
+
+    function subtract(uint x, uint y) internal pure returns (uint z) {
+        require((z = x - y) <= x, "sub-overflow");
+    }
+
+    function toInt(uint x) internal pure returns (int y) {
+        y = int(x);
+        require(y >= 0, "int-overflow");
+    }
+
+    function toRad(uint wad) internal pure returns (uint rad) {
+        rad = multiply(wad, 10 ** 27);
+    }
+
+    function convertTo18(address collateralJoin, uint256 amt) internal returns (uint256 wad) {
+        // For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
+        // Adapters will automatically handle the difference of precision
+        uint decimals = CollateralJoinLike(collateralJoin).decimals();
+        wad = amt;
+        if (decimals < 18) {
+          wad = multiply(
+              amt,
+              10 ** (18 - decimals)
+          );
+        }
+    }
+
+    function _getGeneratedDeltaDebt(
+        address safeEngine,
+        address taxCollector,
+        address safeHandler,
+        bytes32 collateralType,
+        uint wad
+    ) internal returns (int deltaDebt) {
+        // Updates stability fee rate
+        uint rate = TaxCollectorLike(taxCollector).taxSingle(collateralType);
+
+        // Gets COIN balance of the handler in the safeEngine
+        uint coin = SAFEEngineLike(safeEngine).coinBalance(safeHandler);
+
+        // If there was already enough COIN in the safeEngine balance, just exits it without adding more debt
+        if (coin < multiply(wad, RAY)) {
+            // Calculates the needed deltaDebt so together with the existing coins in the safeEngine is enough to exit wad amount of COIN tokens
+            deltaDebt = toInt(subtract(multiply(wad, RAY), coin) / rate);
+            // This is neeeded due lack of precision. It might need to sum an extra deltaDebt wei (for the given COIN wad amount)
+            deltaDebt = multiply(uint(deltaDebt), rate) < multiply(wad, RAY) ? deltaDebt + 1 : deltaDebt;
+        }
+    }
+
+    function _getRepaidDeltaDebt(
+        address safeEngine,
+        uint coin,
+        address safe,
+        bytes32 collateralType
+    ) internal view returns (int deltaDebt) {
+        // Gets actual rate from the safeEngine
+        (, uint rate,,,) = SAFEEngineLike(safeEngine).collateralTypes(collateralType);
+        // Gets actual generatedDebt value of the safe
+        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safe);
+
+        // Uses the whole coin balance in the safeEngine to reduce the debt
+        deltaDebt = toInt(coin / rate);
+        // Checks the calculated deltaDebt is not higher than safe.generatedDebt (total debt), otherwise uses its value
+        deltaDebt = uint(deltaDebt) <= generatedDebt ? - deltaDebt : - toInt(generatedDebt);
+    }
+
+    function _getRepaidAlDebt(
+        address safeEngine,
+        address usr,
+        address safe,
+        bytes32 collateralType
+    ) internal view returns (uint wad) {
+        // Gets actual rate from the safeEngine
+        (, uint rate,,,) = SAFEEngineLike(safeEngine).collateralTypes(collateralType);
+        // Gets actual generatedDebt value of the safe
+        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safe);
+        // Gets actual coin amount in the safe
+        uint coin = SAFEEngineLike(safeEngine).coinBalance(usr);
+
+        uint rad = subtract(multiply(generatedDebt, rate), coin);
+        wad = rad / RAY;
+
+        // If the rad precision has some dust, it will need to request for 1 extra wad wei
+        wad = multiply(wad, RAY) < rad ? wad + 1 : wad;
+    }
+
+    // Public functions
+    function transfer(address collateral, address dst, uint amt) public {
+        CollateralLike(collateral).transfer(dst, amt);
+    }
+
+    function ethJoin_join(address apt, address safe) public payable {
+        ethJoin_join(apt, safe, msg.value);
+    }
+
+    function ethJoin_join(address apt, address safe, uint value) public payable {
+        // Wraps ETH in WETH
+        CollateralJoinLike(apt).collateral().deposit{value: value}();
+        // Approves adapter to take the WETH amount
+        CollateralJoinLike(apt).collateral().approve(address(apt), value);
+        // Joins WETH collateral into the safeEngine
+        CollateralJoinLike(apt).join(safe, value);
+    }
+
+    function approveSAFEModification(
+        address obj,
+        address usr
+    ) public {
+        ApproveSAFEModificationLike(obj).approveSAFEModification(usr);
+    }
+
+    function denySAFEModification(
+        address obj,
+        address usr
+    ) public {
+        ApproveSAFEModificationLike(obj).denySAFEModification(usr);
+    }
+
+    function openSAFE(
+        address manager,
+        bytes32 collateralType,
+        address usr
+    ) public returns (uint safe) {
+        safe = ManagerLike(manager).openSAFE(collateralType, usr);
+    }
+
+    function transferSAFEOwnership(
+        address manager,
+        uint safe,
+        address usr
+    ) public {
+        ManagerLike(manager).transferSAFEOwnership(safe, usr);
+    }
+
+    function transferSAFEOwnershipToProxy(
+        address proxyRegistry,
+        address manager,
+        uint safe,
+        address dst
+    ) public {
+        // Gets actual proxy address
+        address proxy = ProxyRegistryLike(proxyRegistry).proxies(dst);
+        // Checks if the proxy address already existed and dst address is still the owner
+        if (proxy == address(0) || ProxyLike(proxy).owner() != dst) {
+            uint csize;
+            assembly {
+                csize := extcodesize(dst)
+            }
+            // We want to avoid creating a proxy for a contract address that might not be able to handle proxies, then losing the SAFE
+            require(csize == 0, "dst-is-a-contract");
+            // Creates the proxy for the dst address
+            proxy = ProxyRegistryLike(proxyRegistry).build(dst);
+        }
+        // Transfers SAFE to the dst proxy
+        transferSAFEOwnership(manager, safe, proxy);
+    }
+
+    function allowSAFE(
+        address manager,
+        uint safe,
+        address usr,
+        uint ok
+    ) public {
+        ManagerLike(manager).allowSAFE(safe, usr, ok);
+    }
+
+    function allowHandler(
+        address manager,
+        address usr,
+        uint ok
+    ) public {
+        ManagerLike(manager).allowHandler(usr, ok);
+    }
+
+    function transferCollateral(
+        address manager,
+        uint safe,
+        address dst,
+        uint wad
+    ) public {
+        ManagerLike(manager).transferCollateral(safe, dst, wad);
+    }
+
+    function transferInternalCoins(
+        address manager,
+        uint safe,
+        address dst,
+        uint rad
+    ) public {
+        ManagerLike(manager).transferInternalCoins(safe, dst, rad);
+    }
+
+    function modifySAFECollateralization(
+        address manager,
+        uint safe,
+        int deltaCollateral,
+        int deltaDebt
+    ) public {
+        ManagerLike(manager).modifySAFECollateralization(safe, deltaCollateral, deltaDebt);
+    }
+
+    function quitSystem(
+        address manager,
+        uint safe,
+        address dst
+    ) public {
+        ManagerLike(manager).quitSystem(safe, dst);
+    }
+
+    function enterSystem(
+        address manager,
+        address src,
+        uint safe
+    ) public {
+        ManagerLike(manager).enterSystem(src, safe);
+    }
+
+    function moveSAFE(
+        address manager,
+        uint safeSrc,
+        uint safeDst
+    ) public {
+        ManagerLike(manager).moveSAFE(safeSrc, safeDst);
+    }
+
+    function lockETH(
+        address manager,
+        address ethJoin,
+        uint safe
+    ) public payable {
+        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
+        ethJoin_join(ethJoin, address(this));
+        // Locks WETH amount into the SAFE
+        SAFEEngineLike(ManagerLike(manager).safeEngine()).modifySAFECollateralization(
+            ManagerLike(manager).collateralTypes(safe),
+            ManagerLike(manager).safes(safe),
+            address(this),
+            address(this),
+            toInt(msg.value),
+            0
+        );
+    }
+
+    function safeLockETH(
+        address manager,
+        address ethJoin,
+        uint safe,
+        address owner
+    ) public payable {
+        require(ManagerLike(manager).ownsSAFE(safe) == owner, "owner-missmatch");
+        lockETH(manager, ethJoin, safe);
+    }
+
+    function freeETH(
+        address manager,
+        address ethJoin,
+        uint safe,
+        uint wad
+    ) public {
+        // Unlocks WETH amount from the SAFE
+        modifySAFECollateralization(manager, safe, -toInt(wad), 0);
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), wad);
+        // Exits WETH amount to proxy address as a token
+        CollateralJoinLike(ethJoin).exit(address(this), wad);
+        // Converts WETH to ETH
+        CollateralJoinLike(ethJoin).collateral().withdraw(wad);
+        // Sends ETH back to the user's wallet
+        msg.sender.transfer(wad);
+    }
+
+    function exitETH(
+        address manager,
+        address ethJoin,
+        uint safe,
+        uint wad
+    ) public {
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), wad);
+        // Exits WETH amount to proxy address as a token
+        CollateralJoinLike(ethJoin).exit(address(this), wad);
+        // Converts WETH to ETH
+        CollateralJoinLike(ethJoin).collateral().withdraw(wad);
+        // Sends ETH back to the user's wallet
+        msg.sender.transfer(wad);
+    }
+
+    function generateDebt(
+        address manager,
+        address taxCollector,
+        address coinJoin,
+        uint safe,
+        uint wad
+    ) public {
+        address safeHandler = ManagerLike(manager).safes(safe);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        // Generates debt in the SAFE
+        modifySAFECollateralization(manager, safe, 0, _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, wad));
+        // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
+        transferInternalCoins(manager, safe, address(this), toRad(wad));
+        // Allows adapter to access to proxy's COIN balance in the safeEngine
+        if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
+            SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
+        }
+        // Exits COIN to the user's wallet as a token
+        CoinJoinLike(coinJoin).exit(msg.sender, wad);
+    }
+
+    function repayDebt(
+        address manager,
+        address coinJoin,
+        uint safe,
+        uint wad
+    ) public {
+        address safeEngine = ManagerLike(manager).safeEngine();
+        address safeHandler = ManagerLike(manager).safes(safe);
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+
+        address own = ManagerLike(manager).ownsSAFE(safe);
+        if (own == address(this) || ManagerLike(manager).safeCan(own, safe, address(this)) == 1) {
+            // Joins COIN amount into the safeEngine
+            coinJoin_join(coinJoin, safeHandler, wad);
+            // // Paybacks debt to the SAFE
+            modifySAFECollateralization(manager, safe, 0, _getRepaidDeltaDebt(safeEngine, SAFEEngineLike(safeEngine).coinBalance(safeHandler), safeHandler, collateralType));
+        } else {
+             // Joins COIN amount into the safeEngine
+            coinJoin_join(coinJoin, address(this), wad);
+            // Paybacks debt to the SAFE
+            SAFEEngineLike(safeEngine).modifySAFECollateralization(
+                collateralType,
+                safeHandler,
+                address(this),
+                address(this),
+                0,
+                _getRepaidDeltaDebt(safeEngine, wad * RAY, safeHandler, collateralType)
+            );
+        }
+    }
+
+    function safeRepayDebt(
+        address manager,
+        address coinJoin,
+        uint safe,
+        uint wad,
+        address owner
+    ) public {
+        require(ManagerLike(manager).ownsSAFE(safe) == owner, "owner-missmatch");
+        repayDebt(manager, coinJoin, safe, wad);
+    }
+
+    function repayAllDebt(
+        address manager,
+        address coinJoin,
+        uint safe
+    ) public {
+        address safeEngine = ManagerLike(manager).safeEngine();
+        address safeHandler = ManagerLike(manager).safes(safe);
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safeHandler);
+
+        address own = ManagerLike(manager).ownsSAFE(safe);
+        if (own == address(this) || ManagerLike(manager).safeCan(own, safe, address(this)) == 1) {
+            // Joins COIN amount into the safeEngine
+            coinJoin_join(coinJoin, safeHandler, _getRepaidAlDebt(safeEngine, safeHandler, safeHandler, collateralType));
+            // Paybacks debt to the SAFE
+            modifySAFECollateralization(manager, safe, 0, -int(generatedDebt));
+        } else {
+            // Joins COIN amount into the safeEngine
+            coinJoin_join(coinJoin, address(this), _getRepaidAlDebt(safeEngine, address(this), safeHandler, collateralType));
+            // Paybacks debt to the SAFE
+            SAFEEngineLike(safeEngine).modifySAFECollateralization(
+                collateralType,
+                safeHandler,
+                address(this),
+                address(this),
+                0,
+                -int(generatedDebt)
+            );
+        }
+    }
+
+    function safeRepayAllDebt(
+        address manager,
+        address coinJoin,
+        uint safe,
+        address owner
+    ) public {
+        require(ManagerLike(manager).ownsSAFE(safe) == owner, "owner-missmatch");
+        repayAllDebt(manager, coinJoin, safe);
+    }
+
+    function lockETHAndGenerateDebt(
+        address manager,
+        address taxCollector,
+        address ethJoin,
+        address coinJoin,
+        uint safe,
+        uint deltaWad
+    ) public payable {
+        address safeHandler = ManagerLike(manager).safes(safe);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
+        ethJoin_join(ethJoin, safeHandler);
+        // Locks WETH amount into the SAFE and generates debt
+        modifySAFECollateralization(manager, safe, toInt(msg.value), _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, deltaWad));
+        // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
+        transferInternalCoins(manager, safe, address(this), toRad(deltaWad));
+        // Allows adapter to access to proxy's COIN balance in the safeEngine
+        if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
+            SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
+        }
+        // Exits COIN to the user's wallet as a token
+        CoinJoinLike(coinJoin).exit(msg.sender, deltaWad);
+    }
+
+    /// @notice will separate the value necessary to provide liquidity on Uniswap (deltaWad current eth value)
+    /// The remainder will be deposited as collateral on the User's safe. 
+    function lockETHGenerateDebtAndStakeAll(
+        address manager,
+        address taxCollector,
+        address ethJoin,
+        address coinJoin,
+        address uniswapRouter,
+        address gebIncentives,
+        uint safe,
+        uint deltaWad
+    ) public payable {
+        address safeHandler = ManagerLike(manager).safes(safe);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        address systemCoin = address(CoinJoinLike(coinJoin).systemCoin());
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+
+        // getting current price of deltaWad on uniswap
+        uint ethLpAmount = quoteEthUniswap(uniswapRouter, deltaWad, systemCoin);
+
+        // locking ETH and generating debt
+        lockSpecificETHAndGenerateDebtKeepingTokens(manager, taxCollector, ethJoin, coinJoin, safe, deltaWad, msg.value - ethLpAmount);
+
+        // Add liquidity on Uniswap
+        DSTokenLike(systemCoin).approve(uniswapRouter, deltaWad);
+        provideUniswapLiquidityETHToken(uniswapRouter, deltaWad, systemCoin, ethLpAmount);
+
+        // Stake LP tokens in incentives contract
+        address lpToken = getWethPair(uniswapRouter, systemCoin);
+        DSTokenLike(lpToken).approve(uniswapRouter, deltaWad);
+        stakeInGebIncentives(gebIncentives, deltaWad);
+    }
+
+    function stakeInGebIncentives(address gebIncentives, uint amount) public {
+        GebIncentivesLike(gebIncentives).stake(amount);
+    }
+
+    function quoteEthUniswap(address uniswapRouter, uint amount, address token) public view returns (uint) {
+        address pair = getWethPair(uniswapRouter, token);
+        uint wethReserve = DSTokenLike(IUniswapV2Router02(uniswapRouter).WETH()).balanceOf(pair);
+        uint tokenReserve = DSTokenLike(token).balanceOf(pair);
+        return multiply(amount, wethReserve) / tokenReserve;
+    }
+
+    function getWethPair(address uniswapRouter, address token) public view returns (address) {
+        IUniswapV2Router02 router = IUniswapV2Router02(uniswapRouter);
+        IUniswapV2Factory factory = IUniswapV2Factory(router.factory());
+        return factory.getPair(token, router.WETH());
+    }
+
+    function provideUniswapLiquidityETHToken(address uniswapRouter, uint amount, address token, uint ethLpAmount) public payable {
+        (bool success,  ) = address(uniswapRouter).call{value: ethLpAmount}(
+            abi.encodeWithSignature(
+                "addLiquidityETH(address,uint256,uint256,uint256,address,uint256)", 
+                token,
+                amount,
+                1, //todo: add slippage limits
+                1, //todo: add slippage limits
+                address(this),
+                block.timestamp
+            )
+        );
+
+        require(success, "Failed providing liquidity on Uniswap.");
+    }
+
+    function lockSpecificETHAndGenerateDebtKeepingTokens(
+        address manager,
+        address taxCollector,
+        address ethJoin,
+        address coinJoin,
+        uint safe,
+        uint deltaWad,
+        uint ethValueToLock
+    ) internal {
+        address safeHandler = ManagerLike(manager).safes(safe);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
+        ethJoin_join(ethJoin, safeHandler);
+        // Locks WETH amount into the SAFE and generates debt
+        modifySAFECollateralization(manager, safe, toInt(ethValueToLock), _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, deltaWad));
+        // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
+        transferInternalCoins(manager, safe, address(this), toRad(deltaWad));
+        // Allows adapter to access to proxy's COIN balance in the safeEngine
+        if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
+            SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
+        }
+        // Exits COIN to the user's wallet as a token
+        CoinJoinLike(coinJoin).exit(address(this), deltaWad);
+    }    
+
+    function openLockETHAndGenerateDebt(
+        address manager,
+        address taxCollector,
+        address ethJoin,
+        address coinJoin,
+        bytes32 collateralType,
+        uint deltaWad
+    ) public payable returns (uint safe) {
+        safe = openSAFE(manager, collateralType, address(this));
+        lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, safe, deltaWad);
+    }
+
+    function repayDebtAndFreeETH(
+        address manager,
+        address ethJoin,
+        address coinJoin,
+        uint safe,
+        uint collateralWad,
+        uint deltaWad
+    ) public {
+        address safeHandler = ManagerLike(manager).safes(safe);
+        // Joins COIN amount into the safeEngine
+        coinJoin_join(coinJoin, safeHandler, deltaWad);
+        // Paybacks debt to the SAFE and unlocks WETH amount from it
+        modifySAFECollateralization(
+            manager,
+            safe,
+            -toInt(collateralWad),
+            _getRepaidDeltaDebt(ManagerLike(manager).safeEngine(), SAFEEngineLike(ManagerLike(manager).safeEngine()).coinBalance(safeHandler), safeHandler, ManagerLike(manager).collateralTypes(safe))
+        );
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), collateralWad);
+        // Exits WETH amount to proxy address as a token
+        CollateralJoinLike(ethJoin).exit(address(this), collateralWad);
+        // Converts WETH to ETH
+        CollateralJoinLike(ethJoin).collateral().withdraw(collateralWad);
+        // Sends ETH back to the user's wallet
+        msg.sender.transfer(collateralWad);
+    }
+
+    function repayAllDebtAndFreeETH(
+        address manager,
+        address ethJoin,
+        address coinJoin,
+        uint safe,
+        uint collateralWad
+    ) public {
+        address safeEngine = ManagerLike(manager).safeEngine();
+        address safeHandler = ManagerLike(manager).safes(safe);
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safeHandler);
+
+        // Joins COIN amount into the safeEngine
+        coinJoin_join(coinJoin, safeHandler, _getRepaidAlDebt(safeEngine, safeHandler, safeHandler, collateralType));
+        // Paybacks debt to the SAFE and unlocks WETH amount from it
+        modifySAFECollateralization(
+            manager,
+            safe,
+            -toInt(collateralWad),
+            -int(generatedDebt)
+        );
+        // Moves the amount from the SAFE handler to proxy's address
+        transferCollateral(manager, safe, address(this), collateralWad);
+        // Exits WETH amount to proxy address as a token
+        CollateralJoinLike(ethJoin).exit(address(this), collateralWad);
+        // Converts WETH to ETH
+        CollateralJoinLike(ethJoin).collateral().withdraw(collateralWad);
+        // Sends ETH back to the user's wallet
+        msg.sender.transfer(collateralWad);
     }
 }

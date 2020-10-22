@@ -1,6 +1,8 @@
 pragma solidity ^0.6.7;
 
 import "ds-test/test.sol";
+import "ds-weth/weth9.sol";
+import "ds-token/token.sol";
 
 import "../GebProxyActions.sol";
 
@@ -11,6 +13,10 @@ import {DSValue} from "ds-value/value.sol";
 import {GebSafeManager} from "geb-safe-manager/GebSafeManager.sol";
 import {GetSafes} from "geb-safe-manager/GetSafes.sol";
 import {GebProxyRegistry, DSProxyFactory, DSProxy} from "geb-proxy-registry/GebProxyRegistry.sol";
+
+import "../uni/UniswapV2Factory.sol";
+import "../uni/UniswapV2Pair.sol";
+import "../uni/UniswapV2Router02.sol";
 
 contract ProxyCalls {
     DSProxy proxy;
@@ -271,6 +277,12 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     GNT gnt;
     DSValue orclGNT;
     GebProxyRegistry registry;
+
+    UniswapV2Factory uniswapFactory;
+    UniswapV2Router02 uniswapRouter;
+    UniswapV2Pair raiWETHPair;
+    uint256 initETHRAIPairLiquidity = 5 ether;               // 1250 USD
+    uint256 initRAIETHPairLiquidity = 294.672324375E18;      // 1 RAI = 4.242 USD
 
     bytes32 collateralAuctionType = bytes32("ENGLISH");
 
@@ -1192,3 +1204,4 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(coin.balanceOf(address(this)), 49999999999999999999);
     }
 }
+
