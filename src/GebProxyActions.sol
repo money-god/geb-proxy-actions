@@ -113,10 +113,15 @@ abstract contract ProxyRegistryLike {
 }
 
 abstract contract GebIncentivesLike {
+    function rewardToken() virtual public returns (address);
+    function lpToken() virtual public returns (address);
     function stake(uint256 amount) virtual public;
     function withdraw(uint256 amount) virtual public;
     function exit() virtual public;
     function balanceOf(address account) virtual public view returns (uint256);
+    function getLockedReward(address account, uint campaignId, uint timestamp) virtual external;
+    function getReward(uint campaignId) virtual public;
+
 }
 
 abstract contract ProxyLike {
@@ -1664,8 +1669,88 @@ contract GebProxyIncentivesActions is Common {
         // Stake LP tokens in incentives contract
         address lpToken = getWethPair(uniswapRouter, systemCoin);
         DSTokenLike(lpToken).approve(incentives, uint(0 - 1));
-        GebIncentivesLike(incentives).stake(GebIncentivesLike(lpToken).balanceOf(address(this))); // todo: create stakeFor on incentives contract
+        GebIncentivesLike(incentives).stake(DSTokenLike(lpToken).balanceOf(address(this)));
     }
+
+    function harvestReward(address incentives, uint campaignId) public {
+        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
+        incentivesContract.getReward(campaignId);
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
+    }
+
+    function getLockedReward(address incentives, uint campaignId, uint timestamp) public {
+        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
+        incentivesContract.getLockedReward(address(this), campaignId, timestamp);
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
+    }
+
+    function exitIncentives(address incentives) public {
+        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        incentivesContract.exit();
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
+        lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
+    }
+
+    function withdrawFromIncentives(address incentives, uint value) public {
+        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        incentivesContract.withdraw(value);
+        lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
+    }
+
+    function withdrawAndRemoveLiquidity(address coinJoin, address incentives, uint value, address uniswapRouter) public {
+        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        incentivesContract.withdraw(value);
+        lpToken.approve(uniswapRouter, value);
+        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
+            address(CoinJoinLike(coinJoin).systemCoin()),
+            value,
+            1, // todo amountToTokenMin
+            1, // todo amountToEthMin
+            msg.sender,
+            block.timestamp
+        );
+    }
+
+    function exitAndRemoveLiquidity(address coinJoin, address incentives, address uniswapRouter) public {
+        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        incentivesContract.exit();
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
+        lpToken.approve(uniswapRouter, lpToken.balanceOf(address(this)));
+        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
+            address(CoinJoinLike(coinJoin).systemCoin()),
+            lpToken.balanceOf(address(this)),
+            1, // todo amountToTokenMin
+            1, // todo amountToEthMin
+            msg.sender,
+            block.timestamp
+        );
+    }    
+
+    function exitRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, address uniswapRouter) public {
+        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        incentivesContract.exit();
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
+        lpToken.approve(uniswapRouter, lpToken.balanceOf(address(this)));
+        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
+            address(CoinJoinLike(coinJoin).systemCoin()),
+            lpToken.balanceOf(address(this)),
+            1, // todo amountToTokenMin
+            1, // todo amountToEthMin
+            address(this),
+            block.timestamp
+        );
+        repayDebt(manager, coinJoin, safe, lpToken.balanceOf(address(this)));
+    }   
 
     function getWethPair(address uniswapRouter, address token) public view returns (address) {
         IUniswapV2Router02 router = IUniswapV2Router02(uniswapRouter);
