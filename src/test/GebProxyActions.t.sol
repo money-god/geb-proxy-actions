@@ -264,6 +264,11 @@ contract ProxyCalls {
         }
     }
 
+    function lockETHAndGenerateDebtProvideLiquidityUniswap(address, address, address, address, address, uint, uint, uint) public payable {
+        (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data));
+        require(success, "");
+    }            
+
     function generateDebtAndProvideLiquidityUniswap(address, address, address, address, uint, uint) public payable {
         (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data));
         require(success, "");
@@ -296,6 +301,14 @@ contract ProxyCalls {
 
     function exitAndRemoveLiquidity(address join, address pool, address uniswapRouter) public payable {
         proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("exitAndRemoveLiquidity(address,address,address)", join, pool, uniswapRouter));
+    }
+
+    function exitRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address pool, address uniswapRouter) public {
+        proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("exitRemoveLiquidityRepayDebt(address,address,uint256,address,address)", manager, coinJoin, safe, pool, uniswapRouter));
+    }
+
+    function withdrawRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address pool, uint value, address uniswapRouter) public {
+        proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("withdrawRemoveLiquidityRepayDebt(address,address,uint256,address,uint256,address)", manager, coinJoin, safe, pool, value, uniswapRouter));
     }
 }
 
@@ -1327,6 +1340,21 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertTrue(DSTokenLike(lpToken).balanceOf(address(this)) > lpTokenInitialBalance); 
     }
 
+    // function testLockETHAndGenerateDebtProvideLiquidityUniswap() public {
+
+    //     IUniswapV2Factory factory = IUniswapV2Factory(uniswapRouter.factory());
+    //     address lpToken = factory.getPair(address(coin), uniswapRouter.WETH());
+        
+    //     uint lpTokenInitialBalance = DSTokenLike(lpToken).balanceOf(address(this));
+
+    //     uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+    //     this.lockETHAndGenerateDebtProvideLiquidityUniswap{value: 2.5 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), address(uniswapRouter), safe, 300 ether, 0.5 ether);
+    //     assertEq(coin.balanceOf(address(this)), 0 ether);
+    //     assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
+        
+    //     assertTrue(DSTokenLike(lpToken).balanceOf(address(this)) > lpTokenInitialBalance); 
+    // }
+
     function testGenerateDebtAndProvideLiquidityStake() public {
 
         IUniswapV2Factory factory = IUniswapV2Factory(uniswapRouter.factory());
@@ -1382,7 +1410,7 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         hevm.warp(now + 90 days);
         this.getLockedReward(address(incentives), 1, harvestTime);
 
-        assertTrue(incentives.rewardToken().balanceOf(address(this)) > 9.9 ether);
+        assertTrue(incentives.rewardToken().balanceOf(address(this)) > 9.9999 ether);
     }
 
     function testExit() public {
@@ -1401,7 +1429,7 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         hevm.warp(now + 12 days); // campaign over
         this.exitIncentives(address(incentives));
         assertEq(incentives.rewardToken().balanceOf(address(proxy)), 0);
-        assertTrue(incentives.rewardToken().balanceOf(address(this)) > 4.9 ether); // 50% remains locked
+        assertTrue(incentives.rewardToken().balanceOf(address(this)) > 4.9999 ether); // 50% remains locked
         assertTrue(DSTokenLike(lpToken).balanceOf(address(this)) > lpTokenBalanceBeforeExit);
     }
 
@@ -1439,6 +1467,26 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertTrue(coinBalanceBeforeWithdraw < coin.balanceOf(address(this)));
     }
 
+    function testWithdrawRemoveLiquidityRepayDebt() public {
+        IUniswapV2Factory factory = IUniswapV2Factory(uniswapRouter.factory());
+        address lpToken = factory.getPair(address(coin), uniswapRouter.WETH());
+
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        assertEq(coin.balanceOf(address(this)), 0);
+        this.generateDebtAndProvideLiquidityStake{value: 2 ether}(address(manager), address(taxCollector), address(coinJoin), address(uniswapRouter), address(incentives), safe, 300 ether);
+        hevm.warp(12 days);
+        uint lpTokenBalanceBeforeWithdraw = DSTokenLike(lpToken).balanceOf(address(this));
+        uint ethBalanceBeforeWithdraw = address(this).balance;
+        uint coinBalanceBeforeWithdraw = coin.balanceOf(address(this));
+        coin.approve(address(proxy), uint(0 - 1));
+        this.withdrawRemoveLiquidityRepayDebt(address(manager), address(coinJoin), safe, address(incentives), 1 ether, address(uniswapRouter));
+        assertEq(DSToken(lpToken).balanceOf(address(this)), lpTokenBalanceBeforeWithdraw); 
+        assertTrue(ethBalanceBeforeWithdraw < address(this).balance);
+        assertEq(coinBalanceBeforeWithdraw, coin.balanceOf(address(this)));
+        assertTrue(generatedDebt("ETH", manager.safes(safe)) < 50 ether);
+    }
+
     function testExitAndRemoveLiquidity() public {
 
         IUniswapV2Factory factory = IUniswapV2Factory(uniswapRouter.factory());
@@ -1456,6 +1504,29 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(DSToken(lpToken).balanceOf(address(this)), lpTokenBalanceBeforeWithdraw); 
         assertTrue(ethBalanceBeforeWithdraw < address(this).balance);
         assertTrue(coinBalanceBeforeWithdraw < coin.balanceOf(address(this)));
-        assertTrue(incentives.rewardToken().balanceOf(address(this)) > 4.9 ether); // 50% remains locked
+        assertTrue(incentives.rewardToken().balanceOf(address(this)) > 4.9999 ether); // 50% remains locked
+    }
+
+    function testExitRemoveLiquidityRepayDebt() public {
+        IUniswapV2Factory factory = IUniswapV2Factory(uniswapRouter.factory());
+        address lpToken = factory.getPair(address(coin), uniswapRouter.WETH());
+
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        assertEq(coin.balanceOf(address(this)), 0);
+        this.generateDebtAndProvideLiquidityStake{value: 2 ether}(address(manager), address(taxCollector), address(coinJoin), address(uniswapRouter), address(incentives), safe, 300 ether);
+        hevm.warp(12 days);
+        uint lpTokenBalanceBeforeWithdraw = DSTokenLike(lpToken).balanceOf(address(this));
+        uint ethBalanceBeforeWithdraw = address(this).balance;
+        uint coinBalanceBeforeWithdraw = coin.balanceOf(address(this));
+        coin.approve(address(proxy), uint(0 - 1));
+        log_named_uint("debt ", generatedDebt("ETH", manager.safes(safe)));
+        this.exitRemoveLiquidityRepayDebt(address(manager), address(coinJoin), safe, address(incentives), address(uniswapRouter));
+        assertEq(DSToken(lpToken).balanceOf(address(this)), lpTokenBalanceBeforeWithdraw); 
+        assertTrue(ethBalanceBeforeWithdraw < address(this).balance);
+        assertTrue(coinBalanceBeforeWithdraw == coin.balanceOf(address(this)));
+        assertTrue(incentives.rewardToken().balanceOf(address(this)) > 4.9999 ether); // 50% remains locked
+        log_named_uint("debt ", generatedDebt("ETH", manager.safes(safe)));
+        assertTrue(generatedDebt("ETH", manager.safes(safe)) < 10); // almost paid everything, precision affected by uniswap
     }
 }
