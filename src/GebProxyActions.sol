@@ -1584,63 +1584,87 @@ contract GebProxyIncentivesActions is Common {
         msg.sender.transfer(collateralWad);
     }
 
-    // function lockETHAndGenerateDebtProvideLiquidityUniswap(
-    //     address manager,
-    //     address taxCollector,
-    //     address ethJoin,
-    //     address coinJoin,
-    //     address uniswapRouter,
-    //     uint safe,
-    //     uint deltaWad,
-    //     uint liquidityWad
-    // ) public payable {
-    //     address safeHandler = ManagerLike(manager).safes(safe);
-    //     address safeEngine = ManagerLike(manager).safeEngine();
-    //     bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-    //     address systemCoin = address(CoinJoinLike(coinJoin).systemCoin());
-    //     // Receives ETH amount, converts it to WETH and joins it into the safeEngine
-    //     ethJoin_join(ethJoin, safeHandler);
-    //     // Locks WETH amount into the SAFE and generates debt
-    //     modifySAFECollateralization(manager, safe, toInt(subtract(msg.value, liquidityWad)), _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, deltaWad));
-    //     // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
-    //     transferInternalCoins(manager, safe, address(this), toRad(deltaWad));
-    //     // Allows adapter to access to proxy's COIN balance in the safeEngine
-    //     if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
-    //         SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
-    //     }
-    //     // Exits COIN to the user's wallet as a token
-    //     CoinJoinLike(coinJoin).exit(msg.sender, deltaWad);
-
-    //     // Add liquidity on Uniswap
-    //     DSTokenLike(systemCoin).approve(uniswapRouter, deltaWad);
-    //     IUniswapV2Router02 router = IUniswapV2Router02(uniswapRouter);
-
-    //     (bool success,  ) = address(uniswapRouter).call{value: liquidityWad}(
-    //         abi.encodeWithSignature(
-    //             "addLiquidityETH(address,uint256,uint256,uint256,address,uint256)", 
-    //             systemCoin,
-    //             deltaWad,
-    //             1, //todo: add slippage limits
-    //             1, //todo: add slippage limits
-    //             msg.sender,
-    //             block.timestamp
-    //         )
-    //     );
-    //     require(success, "Failed providing liquidity on Uniswap.");
-    // }
-
-    function generateDebtAndProvideLiquidityUniswap(
+    function openLockETHGenerateDebtProvideLiquidityUniswap(
         address manager,
         address taxCollector,
+        address ethJoin,
+        address coinJoin,
+        address uniswapRouter,
+        uint deltaWad,
+        uint liquidityWad
+    ) public payable returns (uint safe) {
+        safe = openSAFE(manager, "ETH", address(this));
+
+        _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
+
+        _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, deltaWad);
+
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, msg.sender);
+    }
+
+
+    function lockETHGenerateDebtProvideLiquidityUniswap(
+        address manager,
+        address taxCollector,
+        address ethJoin,
         address coinJoin,
         address uniswapRouter,
         uint safe,
-        uint wad
+        uint deltaWad,
+        uint liquidityWad
     ) public payable {
+        _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
+
+        _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, deltaWad);
+
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, msg.sender);
+    }
+
+    function openLockETHGenerateDebtProvideLiquidityStake(
+        address manager,
+        address taxCollector,
+        address ethJoin,
+        address coinJoin,
+        address uniswapRouter,
+        address incentives,
+        uint deltaWad,
+        uint liquidityWad
+    ) public payable returns (uint safe) {
+        safe = openSAFE(manager, "ETH", address(this));
+
+        _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
+
+        _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, deltaWad);
+
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, address(this));
+
+        _stakeIncentives(incentives, deltaWad);
+    }
+
+    function lockETHGenerateDebtProvideLiquidityStake(
+        address manager,
+        address taxCollector,
+        address ethJoin,
+        address coinJoin,
+        address uniswapRouter,
+        address incentives,
+        uint safe,
+        uint deltaWad,
+        uint liquidityWad
+    ) public payable {
+        _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
+
+        _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, deltaWad);
+
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, address(this));
+
+        _stakeIncentives(incentives, deltaWad);
+    }
+
+    function _generateDebtKeepTokens(address manager, address taxCollector, address coinJoin, uint safe, uint wad) internal {
         address safeHandler = ManagerLike(manager).safes(safe);
         address safeEngine = ManagerLike(manager).safeEngine();
         bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-        address systemCoin = address(CoinJoinLike(coinJoin).systemCoin());
         // Generates debt in the SAFE
         modifySAFECollateralization(manager, safe, 0, _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, wad));
         // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
@@ -1650,24 +1674,69 @@ contract GebProxyIncentivesActions is Common {
             SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
         }
         // Exits COIN to this contract
-        CoinJoinLike(coinJoin).exit(address(this), wad);
+        CoinJoinLike(coinJoin).exit(address(this), wad);        
+    }
 
-        // Add liquidity on Uniswap
-        DSTokenLike(systemCoin).approve(uniswapRouter, wad);
+    function _lockETH(
+        address manager,
+        address ethJoin,
+        uint safe,
+        uint value
+    ) internal {
+        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
+        ethJoin_join(ethJoin, address(this));
+        // Locks WETH amount into the SAFE
+        SAFEEngineLike(ManagerLike(manager).safeEngine()).modifySAFECollateralization(
+            ManagerLike(manager).collateralTypes(safe),
+            ManagerLike(manager).safes(safe),
+            address(this),
+            address(this),
+            toInt(value),
+            0
+        );
+    }
+
+    function provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad) public payable {
+        DSTokenLike(getWethPair(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()))).transferFrom(msg.sender, address(this), wad);
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.sender);
+    }    
+
+    function _provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad, address to) internal {
+        CoinJoinLike(coinJoin).systemCoin().approve(uniswapRouter, wad);
         IUniswapV2Router02 router = IUniswapV2Router02(uniswapRouter);
 
-        (bool success,  ) = address(uniswapRouter).call{value: msg.value}(
-            abi.encodeWithSignature(
-                "addLiquidityETH(address,uint256,uint256,uint256,address,uint256)", 
-                systemCoin,
-                wad,
-                1, //todo: add slippage limits
-                1, //todo: add slippage limits
-                msg.sender,
-                block.timestamp
-            )
+        IUniswapV2Router02(uniswapRouter).addLiquidityETH{value: msg.value}(
+            address(CoinJoinLike(coinJoin).systemCoin()),
+            wad,
+            1, //todo: add slippage limits
+            1, //todo: add slippage limits
+            to,
+            block.timestamp
         );
-        require(success, "Failed providing liquidity on Uniswap.");
+    }
+
+    function generateDebtAndProvideLiquidityUniswap(
+        address manager,
+        address taxCollector,
+        address coinJoin,
+        address uniswapRouter,
+        uint safe,
+        uint wad
+    ) public payable {
+        _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, wad);
+
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.sender);
+    }
+
+    function stakeIncentives(address incentives, uint wad) public {
+        DSTokenLike(GebIncentivesLike(incentives).lpToken()).transferFrom(msg.sender, address(this), wad);
+        _stakeIncentives(incentives, wad);
+    }
+
+    function _stakeIncentives(address incentives, uint wad) internal {
+        DSTokenLike lpToken = DSTokenLike(GebIncentivesLike(incentives).lpToken());
+        lpToken.approve(incentives, uint(0 - 1));
+        GebIncentivesLike(incentives).stake(lpToken.balanceOf(address(this)));
     }
 
     function generateDebtAndProvideLiquidityStake(
@@ -1679,42 +1748,11 @@ contract GebProxyIncentivesActions is Common {
         uint safe,
         uint wad
     ) public payable {
-        address safeHandler = ManagerLike(manager).safes(safe);
-        address safeEngine = ManagerLike(manager).safeEngine();
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-        address systemCoin = address(CoinJoinLike(coinJoin).systemCoin());
-        // Generates debt in the SAFE
-        modifySAFECollateralization(manager, safe, 0, _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, wad));
-        // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
-        transferInternalCoins(manager, safe, address(this), toRad(wad));
-        // Allows adapter to access to proxy's COIN balance in the safeEngine
-        if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
-            SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
-        }
-        // Exits COIN to this contract
-        CoinJoinLike(coinJoin).exit(address(this), wad);
+        _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, wad);
 
-        // Add liquidity on Uniswap
-        DSTokenLike(systemCoin).approve(uniswapRouter, wad);
-        IUniswapV2Router02 router = IUniswapV2Router02(uniswapRouter);
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, address(this));
 
-        (bool success,  ) = address(uniswapRouter).call{value: msg.value}(
-            abi.encodeWithSignature(
-                "addLiquidityETH(address,uint256,uint256,uint256,address,uint256)", 
-                systemCoin,
-                wad,
-                1, //todo: add slippage limits
-                1, //todo: add slippage limits
-                address(this),
-                block.timestamp
-            )
-        );
-        require(success, "Failed providing liquidity on Uniswap.");
-
-        // Stake LP tokens in incentives contract
-        address lpToken = getWethPair(uniswapRouter, systemCoin);
-        DSTokenLike(lpToken).approve(incentives, uint(0 - 1));
-        GebIncentivesLike(incentives).stake(DSTokenLike(lpToken).balanceOf(address(this)));
+        _stakeIncentives(incentives, wad);
     }
 
     function harvestReward(address incentives, uint campaignId) public {
@@ -1747,19 +1785,37 @@ contract GebProxyIncentivesActions is Common {
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
 
+    function removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value, address to) public {
+        DSTokenLike lpToken = DSTokenLike(getWethPair(uniswapRouter, systemCoin));
+        lpToken.transferFrom(msg.sender, address(this), value);
+        lpToken.approve(uniswapRouter, value);
+        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
+            systemCoin,
+            value,
+            1, // todo amountToTokenMin
+            1, // todo amountToEthMin
+            to,
+            block.timestamp
+        );
+    }    
+
+    function _removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value, address to) internal {
+        DSTokenLike(getWethPair(uniswapRouter, systemCoin)).approve(uniswapRouter, value);
+        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
+            systemCoin,
+            value,
+            1, // todo amountToTokenMin
+            1, // todo amountToEthMin
+            to,
+            block.timestamp
+        );
+    }
+
     function withdrawAndRemoveLiquidity(address coinJoin, address incentives, uint value, address uniswapRouter) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         incentivesContract.withdraw(value);
-        lpToken.approve(uniswapRouter, value);
-        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
-            address(CoinJoinLike(coinJoin).systemCoin()),
-            value,
-            1, // todo amountToTokenMin
-            1, // todo amountToEthMin
-            msg.sender,
-            block.timestamp
-        );
+        _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), value, msg.sender);
     }
 
     function withdrawRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, uint value, address uniswapRouter) public {
@@ -1768,19 +1824,12 @@ contract GebProxyIncentivesActions is Common {
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         incentivesContract.withdraw(value);
-        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
-        lpToken.approve(uniswapRouter, lpToken.balanceOf(address(this)));
-        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
-            address(systemCoin),
-            value,
-            1, // todo amountToTokenMin
-            1, // todo amountToEthMin
-            address(this),
-            block.timestamp
-        );
+
+        _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), value, address(this));
         uint coinAmount = systemCoin.balanceOf(address(this));
         systemCoin.transfer(msg.sender, coinAmount);
         repayDebt(manager, coinJoin, safe, coinAmount);
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         msg.sender.call{value: address(this).balance}("");
     }   
 
@@ -1790,15 +1839,7 @@ contract GebProxyIncentivesActions is Common {
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         incentivesContract.exit();
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
-        lpToken.approve(uniswapRouter, lpToken.balanceOf(address(this)));
-        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
-            address(CoinJoinLike(coinJoin).systemCoin()),
-            lpToken.balanceOf(address(this)),
-            1, // todo amountToTokenMin
-            1, // todo amountToEthMin
-            msg.sender,
-            block.timestamp
-        );
+        _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), lpToken.balanceOf(address(this)), msg.sender);
     }    
 
     function exitRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, address uniswapRouter) public {
@@ -1808,15 +1849,9 @@ contract GebProxyIncentivesActions is Common {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         incentivesContract.exit();
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
-        lpToken.approve(uniswapRouter, lpToken.balanceOf(address(this)));
-        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
-            address(systemCoin),
-            lpToken.balanceOf(address(this)),
-            1, // todo amountToTokenMin
-            1, // todo amountToEthMin
-            address(this),
-            block.timestamp
-        );
+
+        _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), lpToken.balanceOf(address(this)), address(this));
+
         uint coinAmount = systemCoin.balanceOf(address(this));
         systemCoin.transfer(msg.sender, coinAmount);
         repayDebt(manager, coinJoin, safe, coinAmount);
