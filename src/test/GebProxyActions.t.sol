@@ -310,6 +310,58 @@ contract ProxyCalls {
     function withdrawRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address pool, uint value, address uniswapRouter) public {
         proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("withdrawRemoveLiquidityRepayDebt(address,address,uint256,address,uint256,address)", manager, coinJoin, safe, pool, value, uniswapRouter));
     }
+
+    function openLockETHGenerateDebtProvideLiquidityUniswap(address, address, address, address, address, uint, uint) public payable returns (uint safe) {
+        address payable target = address(proxy);
+        bytes memory data = abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data);
+        assembly {
+            let succeeded := call(sub(gas(), 5000), target, callvalue(), add(data, 0x20), mload(data), 0, 0)
+            let size := returndatasize()
+            let response := mload(0x40)
+            mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
+            mstore(response, size)
+            returndatacopy(add(response, 0x20), 0, size)
+
+            safe := mload(add(response, 0x60))
+
+            switch iszero(succeeded)
+            case 1 {
+                // throw if delegatecall failed
+                revert(add(response, 0x20), size)
+            }
+        }
+    }
+
+    function openLockETHGenerateDebtProvideLiquidityStake(address, address, address, address, address, address, uint, uint) public payable returns (uint safe) {
+        address payable target = address(proxy);
+        bytes memory data = abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data);
+        assembly {
+            let succeeded := call(sub(gas(), 5000), target, callvalue(), add(data, 0x20), mload(data), 0, 0)
+            let size := returndatasize()
+            let response := mload(0x40)
+            mstore(0x40, add(response, and(add(add(size, 0x20), 0x1f), not(0x1f))))
+            mstore(response, size)
+            returndatacopy(add(response, 0x20), 0, size)
+
+            safe := mload(add(response, 0x60))
+
+            switch iszero(succeeded)
+            case 1 {
+                // throw if delegatecall failed
+                revert(add(response, 0x20), size)
+            }
+        }
+    }
+
+    function lockETHGenerateDebtProvideLiquidityStake(address, address, address, address, address, address, uint, uint, uint) public payable {
+        (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data));
+        require(success, "");
+    }
+
+    function lockETHGenerateDebtProvideLiquidityUniswap(address, address, address, address, address, uint, uint, uint) public payable {
+        (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data));
+        require(success, "");
+    }
 }
 
 contract FakeUser {
@@ -1260,20 +1312,13 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
     GebSafeManager manager;
 
-    CollateralJoin3 dgdJoin;
-    DGD dgd;
-    DSValue orclDGD;
-    EnglishCollateralAuctionHouse dgdEnglishCollateralAuctionHouse;
-    CollateralJoin4 gntCollateralJoin;
-    GNT gnt;
-    DSValue orclGNT;
     GebProxyRegistry registry;
     GebUniswapRollingDistributionIncentives incentives;
     DSToken rewardToken;
 
     UniswapV2Factory uniswapFactory;
     UniswapV2Router02 uniswapRouter;
-    UniswapV2Pair raiWETHPair;
+    UniswapV2Pair raiETHPair;
     uint256 initETHRAIPairLiquidity = 5 ether;               // 1250 USD
     uint256 initRAIETHPairLiquidity = 294.672324375E18;      // 1 RAI = 4.242 USD
 
@@ -1294,7 +1339,7 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
         // Setup Uniswap
         uniswapFactory = new UniswapV2Factory(address(this));
-        address lpToken = uniswapFactory.createPair(address(weth), address(coin));
+        raiETHPair = UniswapV2Pair(uniswapFactory.createPair(address(weth), address(coin)));
         uniswapRouter = new UniswapV2Router02(address(uniswapFactory), address(weth));
 
         // Add pair liquidity
@@ -1304,12 +1349,14 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
         this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 100 ether);
-        assertEq(coin.balanceOf(address(this)), 100 ether);
         uniswapRouter.addLiquidity(address(weth), address(coin), initETHRAIPairLiquidity, 100 ether, 1 ether, initRAIETHPairLiquidity, address(this), now);
+
+        // zeroing balances
         coin.transfer(address(0), coin.balanceOf(address(this)));
+        raiETHPair.transfer(address(0), raiETHPair.balanceOf(address(this)));
 
         // Setup Incentives
-        incentives = new GebUniswapRollingDistributionIncentives(lpToken, address(col)); // mudar para algum reward token aqui
+        incentives = new GebUniswapRollingDistributionIncentives(address(raiETHPair), address(col));
         col.mint(address(incentives), 20 ether);
         incentives.newCampaign(10 ether, now + 1, 12 days, 90 days, 500);
         hevm.warp(now + 1);
@@ -1323,12 +1370,32 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         (,genDebt) = safeEngine.safes(collateralType, urn);
     }
 
-    function testGenerateDebtAndProvideLiquidityUniswap() public {
-
-        IUniswapV2Factory factory = IUniswapV2Factory(uniswapRouter.factory());
-        address lpToken = factory.getPair(address(coin), uniswapRouter.WETH());
+    function testOpenLockETHGenerateDebtProvideLiquidityUniswap() public {
         
-        uint lpTokenInitialBalance = DSTokenLike(lpToken).balanceOf(address(this));
+        assertEq(raiETHPair.balanceOf(address(this)), 0);
+        uint initialPairTotalSupply = raiETHPair.totalSupply();
+
+        uint safe = this.openLockETHGenerateDebtProvideLiquidityUniswap{value: 2.5 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), address(uniswapRouter), 300 ether, 0.5 ether);
+        assertEq(coin.balanceOf(address(this)), 0 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
+        assertEq(raiETHPair.balanceOf(address(this)), raiETHPair.totalSupply() - initialPairTotalSupply); 
+    }
+
+    function testLockETHGenerateDebtProvideLiquidityUniswap() public {
+        
+        assertEq(raiETHPair.balanceOf(address(this)), 0);
+        uint initialPairTotalSupply = raiETHPair.totalSupply();
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETHGenerateDebtProvideLiquidityUniswap{value: 2.5 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), address(uniswapRouter), safe, 300 ether, 0.5 ether);
+        assertEq(coin.balanceOf(address(this)), 0 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
+        assertEq(raiETHPair.balanceOf(address(this)), raiETHPair.totalSupply() - initialPairTotalSupply); 
+    }
+
+    function testGenerateDebtAndProvideLiquidityUniswap() public {
+        
+        assertEq(raiETHPair.balanceOf(address(this)), 0);
+        uint initialPairTotalSupply = raiETHPair.totalSupply();
 
         uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
@@ -1336,29 +1403,33 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.generateDebtAndProvideLiquidityUniswap{value: 2 ether}(address(manager), address(taxCollector), address(coinJoin), address(uniswapRouter), safe, 300 ether);
         assertEq(coin.balanceOf(address(this)), 0 ether);
         assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
-        
-        assertTrue(DSTokenLike(lpToken).balanceOf(address(this)) > lpTokenInitialBalance); 
+        assertEq(raiETHPair.balanceOf(address(this)), raiETHPair.totalSupply() - initialPairTotalSupply); 
     }
 
-    // function testLockETHAndGenerateDebtProvideLiquidityUniswap() public {
+    function testlockETHGenerateDebtAndProvideLiquidityStake() public {
 
-    //     IUniswapV2Factory factory = IUniswapV2Factory(uniswapRouter.factory());
-    //     address lpToken = factory.getPair(address(coin), uniswapRouter.WETH());
-        
-    //     uint lpTokenInitialBalance = DSTokenLike(lpToken).balanceOf(address(this));
+        assertEq(raiETHPair.balanceOf(address(this)), 0);
+        uint initialPairTotalSupply = raiETHPair.totalSupply();
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETHGenerateDebtProvideLiquidityStake{value: 2.5 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), address(uniswapRouter), address(incentives), safe, 300 ether, 0.5 ether);
+        assertEq(coin.balanceOf(address(this)), 0 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
+        assertEq(raiETHPair.balanceOf(address(incentives)), raiETHPair.totalSupply() - initialPairTotalSupply); 
+        assertTrue(incentives.balanceOf(address(proxy)) > 0);
+    }    
 
-    //     uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
-    //     this.lockETHAndGenerateDebtProvideLiquidityUniswap{value: 2.5 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), address(uniswapRouter), safe, 300 ether, 0.5 ether);
-    //     assertEq(coin.balanceOf(address(this)), 0 ether);
-    //     assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
-        
-    //     assertTrue(DSTokenLike(lpToken).balanceOf(address(this)) > lpTokenInitialBalance); 
-    // }
+    function testOpenLockETHGenerateDebtAndProvideLiquidityStake() public {
+
+        assertEq(raiETHPair.balanceOf(address(this)), 0);
+        uint initialPairTotalSupply = raiETHPair.totalSupply();
+        uint safe = this.openLockETHGenerateDebtProvideLiquidityStake{value: 2.5 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), address(uniswapRouter), address(incentives), 300 ether, 0.5 ether);
+        assertEq(coin.balanceOf(address(this)), 0 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
+        assertEq(raiETHPair.balanceOf(address(incentives)), raiETHPair.totalSupply() - initialPairTotalSupply); 
+        assertTrue(incentives.balanceOf(address(proxy)) > 0);
+    } 
 
     function testGenerateDebtAndProvideLiquidityStake() public {
-
-        IUniswapV2Factory factory = IUniswapV2Factory(uniswapRouter.factory());
-        address lpToken = factory.getPair(address(coin), uniswapRouter.WETH());
 
         uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
@@ -1366,7 +1437,6 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.generateDebtAndProvideLiquidityStake{value: 2 ether}(address(manager), address(taxCollector), address(coinJoin), address(uniswapRouter), address(incentives), safe, 300 ether);
         assertEq(coin.balanceOf(address(this)), 0 ether);
         assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
-        
         assertTrue(incentives.balanceOf(address(proxy)) > 0);
     }
 

@@ -1583,7 +1583,7 @@ contract GebProxyIncentivesActions is Common {
         // Sends ETH back to the user's wallet
         msg.sender.transfer(collateralWad);
     }
-
+    event log_named_uint(string a,uint b);
     function openLockETHGenerateDebtProvideLiquidityUniswap(
         address manager,
         address taxCollector,
@@ -1594,14 +1594,13 @@ contract GebProxyIncentivesActions is Common {
         uint liquidityWad
     ) public payable returns (uint safe) {
         safe = openSAFE(manager, "ETH", address(this));
-
+        
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
 
         _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, deltaWad);
 
-        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, msg.sender);
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, msg.sender);
     }
-
 
     function lockETHGenerateDebtProvideLiquidityUniswap(
         address manager,
@@ -1617,7 +1616,7 @@ contract GebProxyIncentivesActions is Common {
 
         _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, deltaWad);
 
-        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, msg.sender);
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, msg.sender);
     }
 
     function openLockETHGenerateDebtProvideLiquidityStake(
@@ -1636,7 +1635,7 @@ contract GebProxyIncentivesActions is Common {
 
         _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, deltaWad);
 
-        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, address(this));
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, address(this));
 
         _stakeIncentives(incentives, deltaWad);
     }
@@ -1656,7 +1655,7 @@ contract GebProxyIncentivesActions is Common {
 
         _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, deltaWad);
 
-        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, address(this));
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, address(this));
 
         _stakeIncentives(incentives, deltaWad);
     }
@@ -1684,7 +1683,7 @@ contract GebProxyIncentivesActions is Common {
         uint value
     ) internal {
         // Receives ETH amount, converts it to WETH and joins it into the safeEngine
-        ethJoin_join(ethJoin, address(this));
+        ethJoin_join(ethJoin, address(this), value);
         // Locks WETH amount into the SAFE
         SAFEEngineLike(ManagerLike(manager).safeEngine()).modifySAFECollateralization(
             ManagerLike(manager).collateralTypes(safe),
@@ -1698,16 +1697,15 @@ contract GebProxyIncentivesActions is Common {
 
     function provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad) public payable {
         DSTokenLike(getWethPair(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()))).transferFrom(msg.sender, address(this), wad);
-        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.sender);
-    }    
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, msg.sender);
+    }
 
-    function _provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad, address to) internal {
-        CoinJoinLike(coinJoin).systemCoin().approve(uniswapRouter, wad);
+    function _provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint tokenWad, uint ethWad, address to) internal {
+        CoinJoinLike(coinJoin).systemCoin().approve(uniswapRouter, tokenWad);
         IUniswapV2Router02 router = IUniswapV2Router02(uniswapRouter);
-
-        IUniswapV2Router02(uniswapRouter).addLiquidityETH{value: msg.value}(
+        IUniswapV2Router02(uniswapRouter).addLiquidityETH{value: ethWad}(
             address(CoinJoinLike(coinJoin).systemCoin()),
-            wad,
+            tokenWad,
             1, //todo: add slippage limits
             1, //todo: add slippage limits
             to,
@@ -1725,7 +1723,7 @@ contract GebProxyIncentivesActions is Common {
     ) public payable {
         _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, wad);
 
-        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.sender);
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, msg.sender);
     }
 
     function stakeIncentives(address incentives, uint wad) public {
@@ -1750,7 +1748,7 @@ contract GebProxyIncentivesActions is Common {
     ) public payable {
         _generateDebtKeepTokens(manager, taxCollector, coinJoin, safe, wad);
 
-        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, address(this));
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, address(this));
 
         _stakeIncentives(incentives, wad);
     }
