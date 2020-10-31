@@ -1583,7 +1583,7 @@ contract GebProxyIncentivesActions is Common {
         // Sends ETH back to the user's wallet
         msg.sender.transfer(collateralWad);
     }
-    event log_named_uint(string a,uint b);
+
     function openLockETHGenerateDebtProvideLiquidityUniswap(
         address manager,
         address taxCollector,
@@ -1694,9 +1694,9 @@ contract GebProxyIncentivesActions is Common {
             0
         );
     }
-
+    
     function provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad) public payable {
-        DSTokenLike(getWethPair(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()))).transferFrom(msg.sender, address(this), wad);
+        CoinJoinLike(coinJoin).systemCoin().transferFrom(msg.sender, address(this), wad);
         _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, msg.sender);
     }
 
@@ -1783,23 +1783,14 @@ contract GebProxyIncentivesActions is Common {
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
 
-    function removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value, address to) public {
-        DSTokenLike lpToken = DSTokenLike(getWethPair(uniswapRouter, systemCoin));
-        lpToken.transferFrom(msg.sender, address(this), value);
-        lpToken.approve(uniswapRouter, value);
-        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
-            systemCoin,
-            value,
-            1, // todo amountToTokenMin
-            1, // todo amountToEthMin
-            to,
-            block.timestamp
-        );
+    function removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value) public returns (uint amountA, uint amountB) {
+        DSTokenLike(getWethPair(uniswapRouter, systemCoin)).transferFrom(msg.sender, address(this), value);
+        return _removeLiquidityUniswap(uniswapRouter, systemCoin, value, msg.sender);
     }    
 
-    function _removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value, address to) internal {
+    function _removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value, address to) internal returns (uint amountA, uint amountB) {
         DSTokenLike(getWethPair(uniswapRouter, systemCoin)).approve(uniswapRouter, value);
-        IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
+        return IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
             systemCoin,
             value,
             1, // todo amountToTokenMin
@@ -1809,11 +1800,11 @@ contract GebProxyIncentivesActions is Common {
         );
     }
 
-    function withdrawAndRemoveLiquidity(address coinJoin, address incentives, uint value, address uniswapRouter) public {
+    function withdrawAndRemoveLiquidity(address coinJoin, address incentives, uint value, address uniswapRouter) public returns (uint amountA, uint amountB) {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         incentivesContract.withdraw(value);
-        _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), value, msg.sender);
+        return _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), value, msg.sender);
     }
 
     function withdrawRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, uint value, address uniswapRouter) public {
@@ -1831,13 +1822,13 @@ contract GebProxyIncentivesActions is Common {
         msg.sender.call{value: address(this).balance}("");
     }   
 
-    function exitAndRemoveLiquidity(address coinJoin, address incentives, address uniswapRouter) public {
+    function exitAndRemoveLiquidity(address coinJoin, address incentives, address uniswapRouter) public returns (uint amountA, uint amountB) {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         incentivesContract.exit();
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
-        _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), lpToken.balanceOf(address(this)), msg.sender);
+        return _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), lpToken.balanceOf(address(this)), msg.sender);
     }    
 
     function exitRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, address uniswapRouter) public {
@@ -1860,12 +1851,5 @@ contract GebProxyIncentivesActions is Common {
         IUniswapV2Router02 router = IUniswapV2Router02(uniswapRouter);
         IUniswapV2Factory factory = IUniswapV2Factory(router.factory());
         return factory.getPair(token, router.WETH());
-    }
-
-    function quoteEthUniswap(address uniswapRouter, uint amount, address token) public view returns (uint) {
-        address pair = getWethPair(uniswapRouter, token);
-        uint wethReserve = DSTokenLike(IUniswapV2Router02(uniswapRouter).WETH()).balanceOf(pair);
-        uint tokenReserve = DSTokenLike(token).balanceOf(pair);
-        return multiply(amount, wethReserve) / tokenReserve;
     }
 }
