@@ -3,7 +3,7 @@ os:
 language: nix
 nix: 2.3.6
 after_script:
-   - git config credential.helper "store --file=.git/credentials"
+   - git config --global credential.helper "store --file=.git/credentials"
    - echo "https://${GITHUB_TOKEN}:@github.com" > .git/credentials
 before_install:
   - nix-env -iA nixpkgs.cachix
