@@ -1235,7 +1235,7 @@ contract GebProxyIncentivesActions is Common {
         );
     }
 
-    function _stakeIncentives(address incentives, uint wad) internal {
+    function _stakeInMine(address incentives, uint wad) internal {
         DSTokenLike lpToken = DSTokenLike(GebIncentivesLike(incentives).lpToken());
         lpToken.approve(incentives, uint(0 - 1));
         GebIncentivesLike(incentives).stake(lpToken.balanceOf(address(this)));
@@ -1770,7 +1770,7 @@ contract GebProxyIncentivesActions is Common {
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, address(this), minTokenAmounts);
 
-        _stakeIncentives(incentives, deltaWad);
+        _stakeInMine(incentives, deltaWad);
 
         // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
         msg.sender.call{value: address(this).balance}("");
@@ -1797,7 +1797,7 @@ contract GebProxyIncentivesActions is Common {
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, address(this), minTokenAmounts);
 
-        _stakeIncentives(incentives, deltaWad);
+        _stakeInMine(incentives, deltaWad);
 
         // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
         msg.sender.call{value: address(this).balance}("");
@@ -1833,9 +1833,9 @@ contract GebProxyIncentivesActions is Common {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
-    function stakeIncentives(address incentives, uint wad) public {
+    function stakeInMine(address incentives, uint wad) public {
         DSTokenLike(GebIncentivesLike(incentives).lpToken()).transferFrom(msg.sender, address(this), wad);
-        _stakeIncentives(incentives, wad);
+        _stakeInMine(incentives, wad);
     }
 
     function generateDebtAndProvideLiquidityStake(
@@ -1853,7 +1853,7 @@ contract GebProxyIncentivesActions is Common {
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, address(this), minTokenAmounts);
 
-        _stakeIncentives(incentives, wad);
+        _stakeInMine(incentives, wad);
 
         // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
         msg.sender.call{value: address(this).balance}("");
@@ -1874,7 +1874,7 @@ contract GebProxyIncentivesActions is Common {
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
     }
 
-    function exitIncentives(address incentives) public {
+    function exitMine(address incentives) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
@@ -1883,7 +1883,7 @@ contract GebProxyIncentivesActions is Common {
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
 
-    function withdrawFromIncentives(address incentives, uint value) public {
+    function withdrawFromMine(address incentives, uint value) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         incentivesContract.withdraw(value);
