@@ -2,6 +2,9 @@ os:
   - linux
 language: nix
 nix: 2.3.6
+after_script:
+   - git config credential.helper "store --file=.git/credentials"
+   - echo "https://${GITHUB_TOKEN}:@github.com" > .git/credentials
 before_install:
   - nix-env -iA nixpkgs.cachix
   - echo "trusted-users = root travis" | sudo tee -a /etc/nix/nix.conf && sudo pkill nix-daemon
@@ -10,3 +13,6 @@ before_install:
   - nix-env -f https://github.com/makerdao/makerpkgs/tarball/master -iA dappPkgsVersions.hevm-0_41_0.dapp
 script:
   - dapp --use solc:0.6.7 test
+env:
+  global:
+    secure: NHQbNrekoBiWGfFZAZo7r9SeTkmItPAKnNvrDMBYY3Y8kFI5k2evKXMRm0wEUHwwSzzLh/4+46k0sTqlGe+Pf9XgZkgE129bHiAw4cMPj/ZqrFPWWEKWTPs16G04v2Ybbt2DP6Ooo8e7wsC7Kl3xho+EfeVKd6nVd/BCZx7vWApKrKibNtXD2k8xEUzpQgsKDNjrX+tGQz+m1EAQGHJno2f4goq33emA91boGAfCNHlATC/dr9O/F+68nBEv27L05apimToybZbVDNcrxYAW4mhkXziGi3ZwkgO0wa1Fi2y3zlTnoP/ckUXZvHRu3tyKs7LQAFpCfqUVKdX9hdH153XrZuJ5oHHx2I0bbG0Nu2Gmm0pcb9DzuiSJGWfWe2zqAptDQ2OIcw46eUPZfjnJxChKPrNMxwdvH7RQvcErLFCmJAXB+CkJWgxcSt7p3kjP11TyhkMjEHMzc+7Ptxzb4+grhRscYGNKG6P7uFJdkVU9qyh6W/CxuD56EjQHNcUh1raXVF3b36o0oWsTnQOlXP/dzsD2ovbCjA4VbffgP4f2S7TdTpE4Ts4DlGYQqGMweu8oVc2lU+a3PYBU1ody5UuH7xD59UbAA9aAp/5If+BQNcAk+9rtewEeJMoG7G9tP+aTaAoQVezfH3BYP+o5KqBfdK3eblwRJwPDyLMREqw=
