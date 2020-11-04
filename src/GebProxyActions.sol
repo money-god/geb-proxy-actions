@@ -1713,12 +1713,17 @@ contract GebProxyIncentivesActions is Common {
         uint[2] memory minTokenAmounts
     ) public payable returns (uint safe) {
         safe = openSAFE(manager, "ETH", address(this));
+        DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
 
         _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, address(this));
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, msg.sender, minTokenAmounts);
+
+        // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
+        msg.sender.call{value: address(this).balance}("");
+        systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
     function lockETHGenerateDebtProvideLiquidityUniswap(
@@ -1732,11 +1737,17 @@ contract GebProxyIncentivesActions is Common {
         uint liquidityWad,
         uint[2] memory minTokenAmounts
     ) public payable {
+        DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
+
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
 
         _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, address(this));
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, msg.sender, minTokenAmounts);
+
+        // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
+        msg.sender.call{value: address(this).balance}("");
+        systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
     function openLockETHGenerateDebtProvideLiquidityStake(
@@ -1751,6 +1762,7 @@ contract GebProxyIncentivesActions is Common {
         uint[2] memory minTokenAmounts
     ) public payable returns (uint safe) {
         safe = openSAFE(manager, "ETH", address(this));
+        DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
 
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
 
@@ -1759,6 +1771,10 @@ contract GebProxyIncentivesActions is Common {
         _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, address(this), minTokenAmounts);
 
         _stakeIncentives(incentives, deltaWad);
+
+        // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
+        msg.sender.call{value: address(this).balance}("");
+        systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
     function lockETHGenerateDebtProvideLiquidityStake(
@@ -1773,6 +1789,8 @@ contract GebProxyIncentivesActions is Common {
         uint liquidityWad,
         uint[2] memory minTokenAmounts
     ) public payable {
+        DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
+        
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
 
         _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, address(this));
@@ -1780,11 +1798,20 @@ contract GebProxyIncentivesActions is Common {
         _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, address(this), minTokenAmounts);
 
         _stakeIncentives(incentives, deltaWad);
+
+        // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
+        msg.sender.call{value: address(this).balance}("");
+        systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
     
-    function provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad,uint[2] memory minTokenAmounts) public payable {
-        CoinJoinLike(coinJoin).systemCoin().transferFrom(msg.sender, address(this), wad);
+    function provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad, uint[2] memory minTokenAmounts) public payable {
+        DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
+        systemCoin.transferFrom(msg.sender, address(this), wad);
         _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, msg.sender, minTokenAmounts);
+
+        // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
+        msg.sender.call{value: address(this).balance}("");
+        systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
     function generateDebtAndProvideLiquidityUniswap(
@@ -1796,9 +1823,14 @@ contract GebProxyIncentivesActions is Common {
         uint wad,
         uint[2] memory minTokenAmounts
     ) public payable {
+        DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         _generateDebt(manager, taxCollector, coinJoin, safe, wad, address(this));
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, msg.sender, minTokenAmounts);
+
+        // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
+        msg.sender.call{value: address(this).balance}("");
+        systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
     function stakeIncentives(address incentives, uint wad) public {
@@ -1816,11 +1848,16 @@ contract GebProxyIncentivesActions is Common {
         uint wad,
         uint[2] memory minTokenAmounts
     ) public payable {
+        DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         _generateDebt(manager, taxCollector, coinJoin, safe, wad, address(this));
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, address(this), minTokenAmounts);
 
         _stakeIncentives(incentives, wad);
+
+        // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
+        msg.sender.call{value: address(this).balance}("");
+        systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
     function harvestReward(address incentives, uint campaignId) public {
@@ -1850,6 +1887,16 @@ contract GebProxyIncentivesActions is Common {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         incentivesContract.withdraw(value);
+        lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
+    }
+
+    function withdrawAndHarvest(address incentives, uint value, uint campaignId) public {
+        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        incentivesContract.withdraw(value);
+        incentivesContract.getReward(campaignId);
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
 
