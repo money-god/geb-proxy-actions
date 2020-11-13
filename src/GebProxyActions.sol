@@ -1499,17 +1499,7 @@ contract GebProxyIncentivesActions is Common {
         address ethJoin,
         uint safe
     ) public payable {
-        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
-        ethJoin_join(ethJoin, address(this));
-        // Locks WETH amount into the SAFE
-        SAFEEngineLike(ManagerLike(manager).safeEngine()).modifySAFECollateralization(
-            ManagerLike(manager).collateralTypes(safe),
-            ManagerLike(manager).safes(safe),
-            address(this),
-            address(this),
-            toInt(msg.value),
-            0
-        );
+        _lockETH(manager, ethJoin, safe, msg.value);
     }
 
     function freeETH(
@@ -1562,29 +1552,7 @@ contract GebProxyIncentivesActions is Common {
         uint safe,
         uint wad
     ) public {
-        address safeEngine = ManagerLike(manager).safeEngine();
-        address safeHandler = ManagerLike(manager).safes(safe);
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-
-        address own = ManagerLike(manager).ownsSAFE(safe);
-        if (own == address(this) || ManagerLike(manager).safeCan(own, safe, address(this)) == 1) {
-            // Joins COIN amount into the safeEngine
-            coinJoin_join(coinJoin, safeHandler, wad);
-            // // Paybacks debt to the SAFE
-            modifySAFECollateralization(manager, safe, 0, _getRepaidDeltaDebt(safeEngine, SAFEEngineLike(safeEngine).coinBalance(safeHandler), safeHandler, collateralType));
-        } else {
-             // Joins COIN amount into the safeEngine
-            coinJoin_join(coinJoin, address(this), wad);
-            // Paybacks debt to the SAFE
-            SAFEEngineLike(safeEngine).modifySAFECollateralization(
-                collateralType,
-                safeHandler,
-                address(this),
-                address(this),
-                0,
-                _getRepaidDeltaDebt(safeEngine, wad * RAY, safeHandler, collateralType)
-            );
-        }
+        _repayDebt(manager, coinJoin, safe, wad);
     }
 
     function repayAllDebt(
@@ -1592,30 +1560,10 @@ contract GebProxyIncentivesActions is Common {
         address coinJoin,
         uint safe
     ) public {
-        address safeEngine = ManagerLike(manager).safeEngine();
-        address safeHandler = ManagerLike(manager).safes(safe);
         bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safeHandler);
+        (, uint generatedDebt) = SAFEEngineLike(ManagerLike(manager).safeEngine()).safes(collateralType, ManagerLike(manager).safes(safe));
 
-        address own = ManagerLike(manager).ownsSAFE(safe);
-        if (own == address(this) || ManagerLike(manager).safeCan(own, safe, address(this)) == 1) {
-            // Joins COIN amount into the safeEngine
-            coinJoin_join(coinJoin, safeHandler, _getRepaidAlDebt(safeEngine, safeHandler, safeHandler, collateralType));
-            // Paybacks debt to the SAFE
-            modifySAFECollateralization(manager, safe, 0, -int(generatedDebt));
-        } else {
-            // Joins COIN amount into the safeEngine
-            coinJoin_join(coinJoin, address(this), _getRepaidAlDebt(safeEngine, address(this), safeHandler, collateralType));
-            // Paybacks debt to the SAFE
-            SAFEEngineLike(safeEngine).modifySAFECollateralization(
-                collateralType,
-                safeHandler,
-                address(this),
-                address(this),
-                0,
-                -int(generatedDebt)
-            );
-        }
+        _repayDebt(manager, coinJoin, safe, generatedDebt);
     }
 
     function lockETHAndGenerateDebt(
@@ -1626,21 +1574,8 @@ contract GebProxyIncentivesActions is Common {
         uint safe,
         uint deltaWad
     ) public payable {
-        address safeHandler = ManagerLike(manager).safes(safe);
-        address safeEngine = ManagerLike(manager).safeEngine();
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
-        ethJoin_join(ethJoin, safeHandler);
-        // Locks WETH amount into the SAFE and generates debt
-        modifySAFECollateralization(manager, safe, toInt(msg.value), _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, deltaWad));
-        // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
-        transferInternalCoins(manager, safe, address(this), toRad(deltaWad));
-        // Allows adapter to access to proxy's COIN balance in the safeEngine
-        if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
-            SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
-        }
-        // Exits COIN to the user's wallet as a token
-        CoinJoinLike(coinJoin).exit(msg.sender, deltaWad);
+        _lockETH(manager, ethJoin, safe, deltaWad);
+        _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, msg.sender);
     }
 
     function openLockETHAndGenerateDebt(
@@ -1663,22 +1598,7 @@ contract GebProxyIncentivesActions is Common {
         uint collateralWad,
         uint deltaWad
     ) public {
-        address safeHandler = ManagerLike(manager).safes(safe);
-        // Joins COIN amount into the safeEngine
-        coinJoin_join(coinJoin, safeHandler, deltaWad);
-        // Paybacks debt to the SAFE and unlocks WETH amount from it
-        modifySAFECollateralization(
-            manager,
-            safe,
-            -toInt(collateralWad),
-            _getRepaidDeltaDebt(ManagerLike(manager).safeEngine(), SAFEEngineLike(ManagerLike(manager).safeEngine()).coinBalance(safeHandler), safeHandler, ManagerLike(manager).collateralTypes(safe))
-        );
-        // Moves the amount from the SAFE handler to proxy's address
-        transferCollateral(manager, safe, address(this), collateralWad);
-        // Exits WETH amount to proxy address as a token
-        CollateralJoinLike(ethJoin).exit(address(this), collateralWad);
-        // Converts WETH to ETH
-        CollateralJoinLike(ethJoin).collateral().withdraw(collateralWad);
+        _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, collateralWad, deltaWad);
         // Sends ETH back to the user's wallet
         msg.sender.transfer(collateralWad);
     }
@@ -1690,26 +1610,10 @@ contract GebProxyIncentivesActions is Common {
         uint safe,
         uint collateralWad
     ) public {
-        address safeEngine = ManagerLike(manager).safeEngine();
-        address safeHandler = ManagerLike(manager).safes(safe);
         bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safeHandler);
+        (, uint generatedDebt) = SAFEEngineLike(ManagerLike(manager).safeEngine()).safes(collateralType, ManagerLike(manager).safes(safe));
 
-        // Joins COIN amount into the safeEngine
-        coinJoin_join(coinJoin, safeHandler, _getRepaidAlDebt(safeEngine, safeHandler, safeHandler, collateralType));
-        // Paybacks debt to the SAFE and unlocks WETH amount from it
-        modifySAFECollateralization(
-            manager,
-            safe,
-            -toInt(collateralWad),
-            -int(generatedDebt)
-        );
-        // Moves the amount from the SAFE handler to proxy's address
-        transferCollateral(manager, safe, address(this), collateralWad);
-        // Exits WETH amount to proxy address as a token
-        CollateralJoinLike(ethJoin).exit(address(this), collateralWad);
-        // Converts WETH to ETH
-        CollateralJoinLike(ethJoin).collateral().withdraw(collateralWad);
+        _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, collateralWad, generatedDebt);
         // Sends ETH back to the user's wallet
         msg.sender.transfer(collateralWad);
     }
@@ -1931,7 +1835,7 @@ contract GebProxyIncentivesActions is Common {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         incentivesContract.withdraw(value);
 
-        _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), value, address(this), minTokenAmounts);
+        _removeLiquidityUniswap(uniswapRouter, address(systemCoin), value, address(this), minTokenAmounts);
         _repayDebt(manager, coinJoin, safe, systemCoin.balanceOf(address(this)));
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         msg.sender.call{value: address(this).balance}("");
@@ -1944,7 +1848,7 @@ contract GebProxyIncentivesActions is Common {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         incentivesContract.withdraw(valueToWithdraw);
 
-        _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), valueToWithdraw, address(this), minTokenAmounts);
+        _removeLiquidityUniswap(uniswapRouter, address(systemCoin), valueToWithdraw, address(this), minTokenAmounts);
         _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, ethToFree, systemCoin.balanceOf(address(this)));
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         msg.sender.call{value: address(this).balance}("");
@@ -1967,7 +1871,7 @@ contract GebProxyIncentivesActions is Common {
         incentivesContract.exit();
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
 
-        _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), lpToken.balanceOf(address(this)), address(this), minTokenAmounts);
+        _removeLiquidityUniswap(uniswapRouter, address(systemCoin), lpToken.balanceOf(address(this)), address(this), minTokenAmounts);
 
         _repayDebt(manager, coinJoin, safe, systemCoin.balanceOf(address(this)));
         msg.sender.call{value: address(this).balance}("");
@@ -1980,7 +1884,7 @@ contract GebProxyIncentivesActions is Common {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         incentivesContract.exit();
 
-        _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), lpToken.balanceOf(address(this)), address(this), minTokenAmounts);
+        _removeLiquidityUniswap(uniswapRouter, address(systemCoin), lpToken.balanceOf(address(this)), address(this), minTokenAmounts);
         _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, ethToFree, systemCoin.balanceOf(address(this)));
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         msg.sender.call{value: address(this).balance}("");
