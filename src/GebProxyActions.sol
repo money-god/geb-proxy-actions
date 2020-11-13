@@ -1555,17 +1555,6 @@ contract GebProxyIncentivesActions is Common {
         _repayDebt(manager, coinJoin, safe, wad);
     }
 
-    function repayAllDebt(
-        address manager,
-        address coinJoin,
-        uint safe
-    ) public {
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-        (, uint generatedDebt) = SAFEEngineLike(ManagerLike(manager).safeEngine()).safes(collateralType, ManagerLike(manager).safes(safe));
-
-        _repayDebt(manager, coinJoin, safe, generatedDebt);
-    }
-
     function lockETHAndGenerateDebt(
         address manager,
         address taxCollector,
@@ -1599,21 +1588,6 @@ contract GebProxyIncentivesActions is Common {
         uint deltaWad
     ) public {
         _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, collateralWad, deltaWad);
-        // Sends ETH back to the user's wallet
-        msg.sender.transfer(collateralWad);
-    }
-
-    function repayAllDebtAndFreeETH(
-        address manager,
-        address ethJoin,
-        address coinJoin,
-        uint safe,
-        uint collateralWad
-    ) public {
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-        (, uint generatedDebt) = SAFEEngineLike(ManagerLike(manager).safeEngine()).safes(collateralType, ManagerLike(manager).safes(safe));
-
-        _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, collateralWad, generatedDebt);
         // Sends ETH back to the user's wallet
         msg.sender.transfer(collateralWad);
     }
