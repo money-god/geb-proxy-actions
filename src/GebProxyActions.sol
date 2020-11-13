@@ -1917,6 +1917,25 @@ contract GebProxyIncentivesActions is Common {
         _generateDebt(manager, taxCollector, coinJoin, safe, amountToRepay, address(this));
     }
 
+    function flashDeleverageFreeETH(
+        address safeEngine,
+        address uniswapV2Pair,
+        address manager,
+        address ethJoin,
+        address taxCollector,
+        address coinJoin,
+        address weth,
+        address callbackProxy,
+        uint safe,
+        uint amountToFree
+    ) public {
+        flashDeleverage(
+            [safeEngine, uniswapV2Pair, manager, ethJoin, taxCollector, coinJoin, weth, callbackProxy],
+            safe
+        );
+        freeETH(manager, ethJoin, safe, amountToFree);
+    }
+
     function flashDeleverage(
         address[8] memory addresses,
         // address safeEngine,
@@ -1941,7 +1960,6 @@ contract GebProxyIncentivesActions is Common {
         );
         // flashswap
         _startSwap(address(CoinJoinLike(addresses[5]).systemCoin()), generatedDebt, address(0), data, addresses[1], addresses[6], addresses[7]);
-        
     }
 
     function flashDeleverageCallback(uint coinAmount, uint amountToRepay, bytes memory data) internal {
