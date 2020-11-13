@@ -2051,7 +2051,7 @@ contract GebProxyLeverageActions is Common {
         CollateralJoinLike(ethJoin).collateral().withdraw(collateralWad);
     }
 
-    function _startSwap(address _tokenBorrow, uint256 _amount, address _tokenPay, bytes memory _data, address uniswapPair, address weth, address proxy) internal {
+    function _startSwap(address _tokenBorrow, uint256 _amount, address _tokenPay, bytes memory _data, address uniswapPair, address weth, address proxy, uint maxPayout) internal {
         require(_tokenBorrow == address(0) || _tokenPay == address(0), "only eth/token or token/eth swaps valid");
         bool isBorrowingEth;
         bool isPayingEth;
@@ -2078,7 +2078,8 @@ contract GebProxyLeverageActions is Common {
             isPayingEth,
             _data,
             weth,
-            proxy
+            proxy,
+            maxPayout
         );
 
         FlashSwapProxy flashSwapProxy = new FlashSwapProxy(uniswapPair);
@@ -2101,8 +2102,9 @@ contract GebProxyLeverageActions is Common {
             bool _isPayingEth,
             bytes memory _userData,
             address weth,
-            address proxy
-        ) = abi.decode(_data, (address, uint, address, bool, bool, bytes, address, address));
+            address proxy,
+            uint maxPayout
+        ) = abi.decode(_data, (address, uint, address, bool, bool, bytes, address, address, uint));
 
         // unwrap WETH if necessary
         if (_isBorrowingEth) {
@@ -2114,6 +2116,7 @@ contract GebProxyLeverageActions is Common {
         uint pairBalanceTokenBorrow = DSTokenLike(_tokenBorrow).balanceOf(FlashSwapProxy(msg.sender).uniswapPair());
         uint pairBalanceTokenPay = DSTokenLike(_tokenPay).balanceOf(FlashSwapProxy(msg.sender).uniswapPair());
         uint amountToRepay = ((1000 * pairBalanceTokenPay * _amount) / (997 * pairBalanceTokenBorrow)) + 1;
+        require(amountToRepay <= maxPayout, "amount to repay greater than maxPayout");
 
         // get the orignal tokens the user requested
         address tokenBorrowed = _isBorrowingEth ? address(0) : _tokenBorrow;
@@ -2531,7 +2534,8 @@ contract GebProxyLeverageActions is Common {
         address coinJoin,
         address weth,
         address callbackProxy,
-        uint leverage // 3 decimal places, 2.5 == 2500
+        uint leverage, // 3 decimal places, 2.5 == 2500
+        uint maxPayout
     ) public payable returns (uint safe) {
         safe = openSAFE(manager, "ETH", address(this));
         _lockETH(manager, ethJoin, safe, msg.value);
@@ -2544,7 +2548,8 @@ contract GebProxyLeverageActions is Common {
             weth, 
             callbackProxy,
             safe,
-            leverage
+            leverage,
+            maxPayout
         );
     }
 
@@ -2557,7 +2562,8 @@ contract GebProxyLeverageActions is Common {
         address weth,
         address callbackProxy,
         uint safe,
-        uint leverage // 3 decimal places, 2.5 == 2500
+        uint leverage, // 3 decimal places, 2.5 == 2500
+        uint maxPayout
     ) public payable {
         _lockETH(manager, ethJoin, safe, msg.value);
         flashLeverage(
@@ -2569,7 +2575,8 @@ contract GebProxyLeverageActions is Common {
             weth, 
             callbackProxy,
             safe,
-            leverage
+            leverage,
+            maxPayout
         );
     }
 
@@ -2582,7 +2589,8 @@ contract GebProxyLeverageActions is Common {
         address weth,
         address callbackProxy,
         uint safe,
-        uint leverage // 3 decimal places, 2.5 == 2500
+        uint leverage, // 3 decimal places, 2.5 == 2500
+        uint maxPayout // prevent slippage
     ) public {
         (uint collateralBalance,) = SAFEEngineLike(ManagerLike(manager).safeEngine()).safes("ETH", ManagerLike(manager).safes(safe));
 
@@ -2594,7 +2602,7 @@ contract GebProxyLeverageActions is Common {
             coinJoin
         );
         // flashswap
-        _startSwap(address(0), ((collateralBalance * leverage) / 1000) - collateralBalance, address(CoinJoinLike(coinJoin).systemCoin()), data, uniswapV2Pair, weth, callbackProxy);
+        _startSwap(address(0), ((collateralBalance * leverage) / 1000) - collateralBalance, address(CoinJoinLike(coinJoin).systemCoin()), data, uniswapV2Pair, weth, callbackProxy, maxPayout);
     }
 
     function flashLeverageCallback(uint collateralAmount, uint amountToRepay, bytes memory data) internal {
@@ -2657,7 +2665,7 @@ contract GebProxyLeverageActions is Common {
             coinJoin
         );
         // flashswap
-        _startSwap(address(CoinJoinLike(coinJoin).systemCoin()), generatedDebt, address(0), data, uniswapV2Pair, weth, callbackProxy);
+        _startSwap(address(CoinJoinLike(coinJoin).systemCoin()), generatedDebt, address(0), data, uniswapV2Pair, weth, callbackProxy, uint(0) - 1);
     }
 
     function flashDeleverageCallback(uint coinAmount, uint amountToRepay, bytes memory data) internal {
