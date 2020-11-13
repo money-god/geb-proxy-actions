@@ -402,6 +402,14 @@ contract ProxyCalls {
         (bool success,) = address(proxy).call(abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data));
         require(success, "");
     }
+
+    function flashDeleverage(
+        address[8] memory addresses,
+        uint safe
+    ) public {
+        (bool success,) = address(proxy).call(abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data));
+        require(success, "");
+    }
 }
 
 contract FakeUser {
@@ -1460,12 +1468,27 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.lockETH{value: 1 ether}(address(manager), address(ethJoin), safe);
         assertEq(lockedCollateral("ETH", manager.safes(safe)), 1 ether);
 
-        log_named_address("address(raiETHPair)", address(raiETHPair));
-
 
         this.flashLeverage([address(safeEngine), address(raiETHPair), address(manager), address(ethJoin), address(taxCollector), address(coinJoin), address(weth), gebProxyIncentivesActions], safe, 2200); // 2.2x leverage
         assertEq(lockedCollateral("ETH", manager.safes(safe)), 2.2 ether);
         assertEq(generatedDebt("ETH", manager.safes(safe)), 31673969276249802038);
+
+    }
+
+    function testFlashDeleverage() public assertProxyEndsWithNoBalance {
+        
+
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 1 ether}(address(manager), address(ethJoin), safe);
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 1 ether);
+
+        this.flashLeverage([address(safeEngine), address(raiETHPair), address(manager), address(ethJoin), address(taxCollector), address(coinJoin), address(weth), gebProxyIncentivesActions], safe, 2200); // 2.2x leverage
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 2.2 ether);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 31673969276249802038);
+
+        this.flashDeleverage([address(safeEngine), address(raiETHPair), address(manager), address(ethJoin), address(taxCollector), address(coinJoin), address(weth), gebProxyIncentivesActions], safe); 
+        assertEq(lockedCollateral("ETH", manager.safes(safe)), 992767469912244255); // almost 1 eth (flashswap fees)
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 0);
 
     }
 
@@ -1698,13 +1721,11 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uint lpTokenBalanceBeforeWithdraw = raiETHPair.balanceOf(address(this));
         uint ethBalanceBeforeWithdraw = address(this).balance;
         uint coinBalanceBeforeWithdraw = coin.balanceOf(address(this));
-        emit log_named_uint("gen debt", generatedDebt("ETH", manager.safes(safe)));
         this.exitRemoveLiquidityRepayDebt(address(manager), address(coinJoin), safe, address(incentives), address(uniswapRouter), [uint(1),1]);
         assertEq(raiETHPair.balanceOf(address(this)), lpTokenBalanceBeforeWithdraw); 
         assertEq(coinBalanceBeforeWithdraw, coin.balanceOf(address(this)));
         assertTrue(incentives.rewardToken().balanceOf(address(this)) > 4.9999 ether); // 50% remains locked
         assertTrue(ethBalanceBeforeWithdraw < address(this).balance);
-        emit log_named_uint("gen debt", generatedDebt("ETH", manager.safes(safe)));
         assertEq(generatedDebt("ETH", manager.safes(safe)), 260000000000000000002);
     }
 

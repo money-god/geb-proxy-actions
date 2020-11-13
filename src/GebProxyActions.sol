@@ -171,6 +171,8 @@ contract FlashSwapProxy is DSAuthority {
         if( src == address(this) &&
             dst == proxy) return true; // todo: add sig
     }
+
+    fallback() external payable {}
 }
 
 contract Common {
@@ -1349,12 +1351,8 @@ contract GebProxyIncentivesActions is Common {
         CollateralJoinLike(ethJoin).exit(address(this), collateralWad);
         // Converts WETH to ETH
         CollateralJoinLike(ethJoin).collateral().withdraw(collateralWad);
-        // Sends ETH back to the user's wallet
-        msg.sender.transfer(collateralWad);
     }
 
-    event log_named_uint(string, uint);
-    event log_named_address(string, address);
     // @notice Flash-borrows _amount of _tokenBorrow from a Uniswap V2 pair and repays using _tokenPay
     // @param _tokenBorrow The address of the token you want to flash-borrow, use 0x0 for ETH
     // @param _amount The amount of _tokenBorrow you will borrow
@@ -1432,7 +1430,10 @@ contract GebProxyIncentivesActions is Common {
         address tokenToRepay = _isPayingEth ? address(0) : _tokenPay;
 
         // do whatever the user wants
-        flashLeverageCallback(_amount, amountToRepay, _userData);
+        if (_isBorrowingEth)
+            flashLeverageCallback(_amount, amountToRepay, _userData);
+        else
+            flashDeleverageCallback(_amount, amountToRepay, _userData);
 
         // payback loan
         // wrap ETH if necessary
@@ -1874,6 +1875,47 @@ contract GebProxyIncentivesActions is Common {
         ) = abi.decode(data, (address, address, uint, address, address));
         _lockETH(manager, ethJoin, safe, collateralAmount);
         _generateDebt(manager, taxCollector, coinJoin, safe, amountToRepay, address(this));
+    }
+
+    function flashDeleverage(
+        address[8] memory addresses,
+        // address safeEngine,
+        // address uniswapV2Pair,
+        // address manager,
+        // address ethJoin,
+        // address taxCollector,
+        // address coinJoin,
+        // address weth,
+        // address callbackProxy,
+        uint safe
+    ) public {
+        (,uint generatedDebt) = SAFEEngineLike(addresses[0]).safes("ETH", ManagerLike(addresses[2]).safes(safe));
+
+        // encoding data
+        bytes memory data = abi.encode(
+            addresses[2],
+            addresses[3],
+            safe,
+            addresses[4],
+            addresses[5]
+        );
+        // flashswap
+        _startSwap(address(CoinJoinLike(addresses[5]).systemCoin()), generatedDebt, address(0), data, addresses[1], addresses[6], addresses[7]);
+        
+    }
+
+    function flashDeleverageCallback(uint coinAmount, uint amountToRepay, bytes memory data) internal {
+        // decode data
+        (
+            address manager,
+            address ethJoin,
+            uint safe,
+            address taxCollector,
+            address coinJoin
+        ) = abi.decode(data, (address, address, uint, address, address));
+        require(coinAmount == CoinJoinLike(coinJoin).systemCoin().balanceOf(address(this)), "funds not here");
+
+        _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, amountToRepay, coinAmount);
     }
 
     function openLockETHGenerateDebtProvideLiquidityUniswap(
