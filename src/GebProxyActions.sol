@@ -169,7 +169,9 @@ contract FlashSwapProxy is DSAuthority {
         address src, address dst, bytes4 sig
     ) external override view returns (bool) {
         if( src == address(this) &&
-            dst == proxy) return true; // todo: add sig
+            dst == proxy &&
+            sig == 0x1cff79cd) // can only call uniswapCallback
+            return true;
     }
 
     fallback() external payable {}
@@ -1397,8 +1399,6 @@ contract GebProxyIncentivesActions is Common {
 
     // @notice Function is called by the Uniswap V2 pair's `swap` function
     function uniswapV2Call(address _sender, uint _amount0, uint _amount1, bytes calldata _data) external {
-        // access control
-        // require(msg.sender == permissionedPairAddress, "only permissioned UniswapV2 pair can call"); // todo: implement access control
         require(_sender == address(this), "only this contract may initiate");
         DSAuth(address(this)).setAuthority(DSAuthority(address(0)));
 
@@ -1831,6 +1831,46 @@ contract GebProxyIncentivesActions is Common {
         CollateralJoinLike(ethJoin).collateral().withdraw(collateralWad);
         // Sends ETH back to the user's wallet
         msg.sender.transfer(collateralWad);
+    }
+
+    function openLockETHLeverage(        
+        address safeEngine,
+        address uniswapV2Pair,
+        address manager,
+        address ethJoin,
+        address taxCollector,
+        address coinJoin,
+        address weth,
+        address callbackProxy,
+        uint leverage // 3 decimal places, 2.5 == 2500
+    ) public payable returns (uint safe) {
+        safe = openSAFE(manager, "ETH", address(this));
+        _lockETH(manager, ethJoin, safe, msg.value);
+        flashLeverage(
+            [safeEngine, uniswapV2Pair, manager, ethJoin, taxCollector, coinJoin, weth, callbackProxy],
+            safe,
+            leverage
+        );
+    }
+
+    function lockETHLeverage(        
+        address safeEngine,
+        address uniswapV2Pair,
+        address manager,
+        address ethJoin,
+        address taxCollector,
+        address coinJoin,
+        address weth,
+        address callbackProxy,
+        uint safe,
+        uint leverage // 3 decimal places, 2.5 == 2500
+    ) public payable {
+        _lockETH(manager, ethJoin, safe, msg.value);
+        flashLeverage(
+            [safeEngine, uniswapV2Pair, manager, ethJoin, taxCollector, coinJoin, weth, callbackProxy],
+            safe,
+            leverage
+        );
     }
 
     function flashLeverage(
