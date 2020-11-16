@@ -1,4 +1,4 @@
-pragma solidity ^0.6.7;
+pragma solidity 0.6.7;
 
 contract DGD {
     function add(uint x, uint y) internal pure returns (uint z) {
