@@ -1144,25 +1144,33 @@ contract GebProxyActionsCoinSavingsAccount is Common {
     }
 }
 
+/// @title Incentives proxy actions
+/// @notice This contract is supposed to be used along a DS-Proxy contract.
+/// @dev These functions meant to be used as a a library for a DSProxy. Some are unsafe if you call them directly.
 contract GebProxyIncentivesActions is Common {
     // Internal functions
 
+    /// @notice Safe subtraction
+    /// @dev Reverts on overflows
     function subtract(uint x, uint y) internal pure returns (uint z) {
         require((z = x - y) <= x, "sub-overflow");
     }
 
+    /// @notice Safe conversion uint -> int
+    /// @dev Reverts on overflows
     function toInt(uint x) internal pure returns (int y) {
         y = int(x);
         require(y >= 0, "int-overflow");
     }
 
+    /// @notice Converts a wad (18 decimal places) to rad (45 decimal places)
     function toRad(uint wad) internal pure returns (uint rad) {
         rad = multiply(wad, 10 ** 27);
     }
 
+    /// @notice For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
+    /// @dev Adapters will automatically handle the difference of precision
     function convertTo18(address collateralJoin, uint256 amt) internal returns (uint256 wad) {
-        // For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
-        // Adapters will automatically handle the difference of precision
         uint decimals = CollateralJoinLike(collateralJoin).decimals();
         wad = amt;
         if (decimals < 18) {
@@ -1173,6 +1181,12 @@ contract GebProxyIncentivesActions is Common {
         }
     }
 
+    /// @notice Gets delta debt generated (Total Safe debt minus available safeHandler COIN balance)
+    /// @param safeEngine address
+    /// @param taxCollector address
+    /// @param safeHandler address
+    /// @param collateralType bytes32
+    /// @return deltaDebt
     function _getGeneratedDeltaDebt(
         address safeEngine,
         address taxCollector,
@@ -1195,6 +1209,12 @@ contract GebProxyIncentivesActions is Common {
         }
     }
 
+    /// @notice Gets repaid delta debt generated (rate adjusted debt)
+    /// @param safeEngine address
+    /// @param coin uint amount
+    /// @param safe uint - safeId
+    /// @param collateralType bytes32
+        /// @return deltaDebt
     function _getRepaidDeltaDebt(
         address safeEngine,
         uint coin,
@@ -1212,6 +1232,12 @@ contract GebProxyIncentivesActions is Common {
         deltaDebt = uint(deltaDebt) <= generatedDebt ? - deltaDebt : - toInt(generatedDebt);
     }
 
+    /// @notice Gets repaid debt (rate adjusted rate minus COIN balance available in usr's address)
+    /// @param safeEngine address
+    /// @param usr address
+    /// @param safe uint
+    /// @param collateralType address
+    /// @return wad
     function _getRepaidAlDebt(
         address safeEngine,
         address usr,
@@ -1232,6 +1258,13 @@ contract GebProxyIncentivesActions is Common {
         wad = multiply(wad, RAY) < rad ? wad + 1 : wad;
     }
 
+    /// @notice Generates Debt (and sends coin balance to address to)
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param safe uint
+    /// @param wad uint - amount of debt to be generated
+    /// @param to address - receiver of the balance of generated COIN
     function _generateDebt(address manager, address taxCollector, address coinJoin, uint safe, uint wad, address to) internal {
         address safeHandler = ManagerLike(manager).safes(safe);
         address safeEngine = ManagerLike(manager).safeEngine();
@@ -1248,6 +1281,12 @@ contract GebProxyIncentivesActions is Common {
         CoinJoinLike(coinJoin).exit(to, wad);
     }
 
+    /// @notice Generates Debt (and sends coin balance to address to)
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param safe uint
+    /// @param value uint - amount of ETH to be locked in the Safe. 
+    /// @dev Proxy needs to have enough balance (> value), public functions should handle this.
     function _lockETH(
         address manager,
         address ethJoin,
@@ -1267,6 +1306,15 @@ contract GebProxyIncentivesActions is Common {
         );
     }
 
+    /// @notice Provides liquidity on uniswap.
+    /// @param coinJoin address
+    /// @param uniswapRouter address - Uniswap Router V2
+    /// @param tokenWad uint - amount of tokens to provide liquidity with
+    /// @param ethWad uint - amount of ETH to provide liquidity with
+    /// @param to address - receiver of the balance of generated LP Tokens
+    /// @param minTokenAmounts uint - Minimum amounts of both ETH and the token (user selected acceptable slippage)
+    /// @dev Uniswap will return unused tokens (it provides liquidity with the best current ratio)
+    /// @dev Public funcitons should account for change sent from Uniswap
     function _provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint tokenWad, uint ethWad, address to, uint[2] memory minTokenAmounts) internal {
         CoinJoinLike(coinJoin).systemCoin().approve(uniswapRouter, tokenWad);
         IUniswapV2Router02 router = IUniswapV2Router02(uniswapRouter);
@@ -1280,12 +1328,21 @@ contract GebProxyIncentivesActions is Common {
         );
     }
 
+    /// @notice Stakes in Incentives Pool (geb-incentives)
+    /// @param incentives address - Liquidity mining pool
+    /// @param wad uint - Amount of LP tokens to stake
     function _stakeInMine(address incentives, uint wad) internal {
         DSTokenLike lpToken = DSTokenLike(GebIncentivesLike(incentives).lpToken());
         lpToken.approve(incentives, uint(0 - 1));
         GebIncentivesLike(incentives).stake(lpToken.balanceOf(address(this)));
     }
 
+    /// @notice Removes liquidity from Uniswap
+    /// @param uniswapRouter address - Uniswap Router V2
+    /// @param systemCoin address - Address of COIN
+    /// @param value uint - amount of LP Tokens to remove liquidity with
+    /// @param to address - receiver of the balances of generated ETH / COIN
+    /// @param minTokenAmounts uint - Minimum amounts of both ETH and the token (user selected acceptable slippage)
     function _removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value, address to, uint[2] memory minTokenAmounts) internal returns (uint amountA, uint amountB) {
         DSTokenLike(getWethPair(uniswapRouter, systemCoin)).approve(uniswapRouter, value);
         return IUniswapV2Router02(uniswapRouter).removeLiquidityETH(
@@ -1298,6 +1355,11 @@ contract GebProxyIncentivesActions is Common {
         );
     }
 
+    /// @notice Repays debt
+    /// @param manager address
+    /// @param coinJoin address
+    /// @param safe uint 
+    /// @param wad uint - amount of debt to be repayed
     function _repayDebt(
         address manager,
         address coinJoin,
@@ -1329,6 +1391,13 @@ contract GebProxyIncentivesActions is Common {
         }
     }
 
+    /// @notice Repays debt and frees collateral ETH
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param safe uint 
+    /// @param collateralWad uint - amount of ETH to free
+    /// @param deltaWad uint - amount of debt to be repayed
     function _repayDebtAndFreeETH(
         address manager,
         address ethJoin,
@@ -1356,14 +1425,26 @@ contract GebProxyIncentivesActions is Common {
     }
 
     // Public functions
+
+    /// @notice ERC20 transfer
+    /// @param collateral address - address of ERC20 collateral
+    /// @param dst address - Transfer destination
+    /// @param amt address - Amount to transfer
     function transfer(address collateral, address dst, uint amt) public {
         CollateralLike(collateral).transfer(dst, amt);
     }
 
+    /// @notice Joins the system with the full msg.value
+    /// @param apt address - Address of the adapter
+    /// @param safe uint - Safe Id
     function ethJoin_join(address apt, address safe) public payable {
         ethJoin_join(apt, safe, msg.value);
     }
 
+    /// @notice Joins the system with the a specified value
+    /// @param apt address - Address of the adapter
+    /// @param safe uint - Safe Id
+    /// @param value uint - Value to join
     function ethJoin_join(address apt, address safe, uint value) public payable {
         // Wraps ETH in WETH
         CollateralJoinLike(apt).collateral().deposit{value: value}();
@@ -1373,20 +1454,30 @@ contract GebProxyIncentivesActions is Common {
         CollateralJoinLike(apt).join(safe, value);
     }
 
+    /// @notice Approves an address to modify the Safe
+    /// @param safeEngine address
+    /// @param usr address - Address allowed to modify Safe
     function approveSAFEModification(
-        address obj,
+        address safeEngine,
         address usr
     ) public {
-        ApproveSAFEModificationLike(obj).approveSAFEModification(usr);
+        ApproveSAFEModificationLike(safeEngine).approveSAFEModification(usr);
     }
 
+    /// @notice Denies an address to modify the Safe
+    /// @param safeEngine address
+    /// @param usr address - Address disallowed to modify Safe
     function denySAFEModification(
-        address obj,
+        address safeEngine,
         address usr
     ) public {
-        ApproveSAFEModificationLike(obj).denySAFEModification(usr);
+        ApproveSAFEModificationLike(safeEngine).denySAFEModification(usr);
     }
 
+    /// @notice Opens a brand new Safe
+    /// @param manager address - Safe Manager
+    /// @param collateralType bytes32 - collateral type
+    /// @param usr address - Owner of the safe
     function openSAFE(
         address manager,
         bytes32 collateralType,
@@ -1395,6 +1486,10 @@ contract GebProxyIncentivesActions is Common {
         safe = ManagerLike(manager).openSAFE(collateralType, usr);
     }
 
+    /// @notice Transfer the ownership of a proxy owned Safe
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param usr address - Owner of the safe
     function transferSAFEOwnership(
         address manager,
         uint safe,
@@ -1403,6 +1498,11 @@ contract GebProxyIncentivesActions is Common {
         ManagerLike(manager).transferSAFEOwnership(safe, usr);
     }
 
+    /// @notice Transfer the ownership to a new proxy owned by a different address
+    /// @param proxyRegistry address - Safe Manager
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param dst address - Owner of the new proxy
     function transferSAFEOwnershipToProxy(
         address proxyRegistry,
         address manager,
@@ -1426,6 +1526,11 @@ contract GebProxyIncentivesActions is Common {
         transferSAFEOwnership(manager, safe, proxy);
     }
 
+    /// @notice Allow/disallow a usr address to manage the safe
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param usr address - usr address
+    /// uint ok - 1 for allowed
     function allowSAFE(
         address manager,
         uint safe,
@@ -1435,6 +1540,10 @@ contract GebProxyIncentivesActions is Common {
         ManagerLike(manager).allowSAFE(safe, usr, ok);
     }
 
+    /// @notice Allow/disallow a usr address to quit to the sender handler
+    /// @param manager address - Safe Manager
+    /// @param usr address - usr address
+    /// uint ok - 1 for allowed
     function allowHandler(
         address manager,
         address usr,
@@ -1443,6 +1552,11 @@ contract GebProxyIncentivesActions is Common {
         ManagerLike(manager).allowHandler(usr, ok);
     }
 
+    /// @notice Transfer wad amount of safe collateral from the safe address to a dst address.
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param dst address - destination address
+    /// uint wad - amount
     function transferCollateral(
         address manager,
         uint safe,
@@ -1452,6 +1566,11 @@ contract GebProxyIncentivesActions is Common {
         ManagerLike(manager).transferCollateral(safe, dst, wad);
     }
 
+    /// @notice Transfer rad amount of COIN from the safe address to a dst address.
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param dst address - destination address
+    /// uint rad - amount
     function transferInternalCoins(
         address manager,
         uint safe,
@@ -1461,6 +1580,12 @@ contract GebProxyIncentivesActions is Common {
         ManagerLike(manager).transferInternalCoins(safe, dst, rad);
     }
 
+    
+    /// @notice Modify a SAFE's collateralization ratio while keeping the generated COIN or collateral freed in the SAFE handler address.
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param deltaCollateral - int
+    /// @param deltaDebt - int
     function modifySAFECollateralization(
         address manager,
         uint safe,
@@ -1470,6 +1595,10 @@ contract GebProxyIncentivesActions is Common {
         ManagerLike(manager).modifySAFECollateralization(safe, deltaCollateral, deltaDebt);
     }
 
+    /// @notice Quit the system, migrating the safe (lockedCollateral, generatedDebt) to a different dst handler
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param dst - destination handler 
     function quitSystem(
         address manager,
         uint safe,
@@ -1478,6 +1607,10 @@ contract GebProxyIncentivesActions is Common {
         ManagerLike(manager).quitSystem(safe, dst);
     }
 
+    /// @notice Import a position from src handler to the handler owned by safe
+    /// @param manager address - Safe Manager
+    /// @param src - source handler 
+    /// @param safe uint - Safe Id
     function enterSystem(
         address manager,
         address src,
@@ -1486,6 +1619,10 @@ contract GebProxyIncentivesActions is Common {
         ManagerLike(manager).enterSystem(src, safe);
     }
 
+    /// @notice Move a position from safeSrc handler to the safeDst handler
+    /// @param manager address - Safe Manager
+    /// @param safeSrc uint - Source Safe Id
+    /// @param safeDst uint - Destination Safe Id
     function moveSAFE(
         address manager,
         uint safeSrc,
@@ -1494,6 +1631,10 @@ contract GebProxyIncentivesActions is Common {
         ManagerLike(manager).moveSAFE(safeSrc, safeDst);
     }
 
+    /// @notice Lock ETH (msg.value) as collateral in safe
+    /// @param manager address - Safe Manager
+    /// @param ethJoin address
+    /// @param safe uint - Safe Id
     function lockETH(
         address manager,
         address ethJoin,
@@ -1502,6 +1643,11 @@ contract GebProxyIncentivesActions is Common {
         _lockETH(manager, ethJoin, safe, msg.value);
     }
 
+    /// @notice Free ETH (wad) from safe and sends it to msg.sender
+    /// @param manager address - Safe Manager
+    /// @param ethJoin address
+    /// @param safe uint - Safe Id
+    /// @param wad uint - Amount
     function freeETH(
         address manager,
         address ethJoin,
@@ -1520,6 +1666,12 @@ contract GebProxyIncentivesActions is Common {
         msg.sender.transfer(wad);
     }
 
+
+    /// @notice Exits ETH (wad) from balance available in the handler
+    /// @param manager address - Safe Manager
+    /// @param ethJoin address
+    /// @param safe uint - Safe Id
+    /// @param wad uint - Amount
     function exitETH(
         address manager,
         address ethJoin,
@@ -1536,6 +1688,12 @@ contract GebProxyIncentivesActions is Common {
         msg.sender.transfer(wad);
     }
 
+    /// @notice Generates debt and sends COIN amount to msg.sender
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param wad uint - Amount
     function generateDebt(
         address manager,
         address taxCollector,
@@ -1546,6 +1704,11 @@ contract GebProxyIncentivesActions is Common {
         _generateDebt(manager, taxCollector, coinJoin, safe, wad, msg.sender);
     }
 
+    /// @notice Repays debt
+    /// @param manager address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param wad uint - Amount
     function repayDebt(
         address manager,
         address coinJoin,
@@ -1555,6 +1718,13 @@ contract GebProxyIncentivesActions is Common {
         _repayDebt(manager, coinJoin, safe, wad);
     }
 
+    /// @notice Locks Eth, generates debt and sends COIN amount (deltaWad) to msg.sender
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param deltaWad uint - Amount
     function lockETHAndGenerateDebt(
         address manager,
         address taxCollector,
@@ -1567,6 +1737,12 @@ contract GebProxyIncentivesActions is Common {
         _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, msg.sender);
     }
 
+    /// @notice Opens Safe, locks Eth, generates debt and sends COIN amount (deltaWad) to msg.sender
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param deltaWad uint - Amount
     function openLockETHAndGenerateDebt(
         address manager,
         address taxCollector,
@@ -1579,6 +1755,13 @@ contract GebProxyIncentivesActions is Common {
         lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, safe, deltaWad);
     }
 
+    /// @notice Repays debt and frees ETH (sends it to msg.sender)
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param collateralWad uint - Amount of collateral to free
+    /// @param deltaWad uint - Amount of debt to repay
     function repayDebtAndFreeETH(
         address manager,
         address ethJoin,
@@ -1592,6 +1775,15 @@ contract GebProxyIncentivesActions is Common {
         msg.sender.transfer(collateralWad);
     }
 
+    /// @notice Opens Safe, locks Eth, generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param deltaWad uint - Amount of debt to generate
+    /// @param liquidityWad uint - Amount of ETH to be provided as liquidity (the remainder of msg.value will be used to collateralize the Safe)
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function openLockETHGenerateDebtProvideLiquidityUniswap(
         address manager,
         address taxCollector,
@@ -1616,6 +1808,16 @@ contract GebProxyIncentivesActions is Common {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
+    /// @notice Locks Eth, generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param safe uint - Safe Id
+    /// @param deltaWad uint - Amount of debt to generate
+    /// @param liquidityWad uint - Amount of ETH to be provided as liquidity (the remainder of msg.value will be used to collateralize the Safe)
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function lockETHGenerateDebtProvideLiquidityUniswap(
         address manager,
         address taxCollector,
@@ -1640,6 +1842,16 @@ contract GebProxyIncentivesActions is Common {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
+    /// @notice Opens Safe, locks Eth, generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap and stakes LP tokens in Farm
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param incentives address - Liquidity mining pool
+    /// @param deltaWad uint - Amount of debt to generate
+    /// @param liquidityWad uint - Amount of ETH to be provided as liquidity (the remainder of msg.value will be used to collateralize the Safe)
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function openLockETHGenerateDebtProvideLiquidityStake(
         address manager,
         address taxCollector,
@@ -1667,6 +1879,17 @@ contract GebProxyIncentivesActions is Common {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
+    /// @notice Locks Eth, generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap and stakes LP tokens in Farm
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param incentives address - Liquidity mining pool
+    /// @param safe uint - Safe Id
+    /// @param deltaWad uint - Amount of debt to generate
+    /// @param liquidityWad uint - Amount of ETH to be provided as liquidity (the remainder of msg.value will be used to collateralize the Safe)
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function lockETHGenerateDebtProvideLiquidityStake(
         address manager,
         address taxCollector,
@@ -1694,6 +1917,11 @@ contract GebProxyIncentivesActions is Common {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
+    /// @notice Provides liquidity to Uniswap
+    /// @param coinJoin address
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param wad uint - Amount of coin to provide (msg.value for ETH)
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad, uint[2] memory minTokenAmounts) public payable {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         systemCoin.transferFrom(msg.sender, address(this), wad);
@@ -1704,6 +1932,14 @@ contract GebProxyIncentivesActions is Common {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
+    /// @notice Generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param safe uint - Safe Id
+    /// @param wad uint - Amount of debt to generate
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function generateDebtAndProvideLiquidityUniswap(
         address manager,
         address taxCollector,
@@ -1723,11 +1959,21 @@ contract GebProxyIncentivesActions is Common {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
+    /// @notice Stakes in liquidity mining pool
+    /// @param incentives address - pool address
+    /// @param wad uint - amount
     function stakeInMine(address incentives, uint wad) public {
         DSTokenLike(GebIncentivesLike(incentives).lpToken()).transferFrom(msg.sender, address(this), wad);
         _stakeInMine(incentives, wad);
     }
-
+    /// @notice Generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap and stakes LP tokens in Farm
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param incentives address - Liquidity mining pool
+    /// @param safe uint - Safe Id
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function generateDebtAndProvideLiquidityStake(
         address manager,
         address taxCollector,
@@ -1750,6 +1996,9 @@ contract GebProxyIncentivesActions is Common {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
+    /// @notice Harvests rewards from liquidity mining pool
+    /// @param incentives address - Liquidity mining pool
+    /// @param campaignId uint - Id of the campaign to get rewards from
     function harvestReward(address incentives, uint campaignId) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
@@ -1757,6 +2006,9 @@ contract GebProxyIncentivesActions is Common {
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
     }
 
+    /// @notice Gets vested rewards from liquidity mining campaign
+    /// @param incentives address - Liquidity mining pool
+    /// @param campaignId uint - Id of the campaign to get rewards from
     function getLockedReward(address incentives, uint campaignId) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
@@ -1764,6 +2016,8 @@ contract GebProxyIncentivesActions is Common {
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
     }
 
+    /// @notice Exits liquidity mining pool (withdraw LP tokens and getRewards for current campaign)
+    /// @param incentives address - Liquidity mining pool
     function exitMine(address incentives) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
@@ -1773,6 +2027,9 @@ contract GebProxyIncentivesActions is Common {
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
 
+    /// @notice Withdraw LP tokens from liquidity mining pool
+    /// @param incentives address - Liquidity mining pool
+    /// @param value uint - value to withdraw
     function withdrawFromMine(address incentives, uint value) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
@@ -1780,6 +2037,10 @@ contract GebProxyIncentivesActions is Common {
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
 
+    /// @notice Withdraw LP tokens from liquidity mining pool and harvests rewards
+    /// @param incentives address - Liquidity mining pool
+    /// @param value uint - value to withdraw
+    /// @param campaignId uint - Id of the campaign to get rewards from
     function withdrawAndHarvest(address incentives, uint value, uint campaignId) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
@@ -1790,11 +2051,21 @@ contract GebProxyIncentivesActions is Common {
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
 
+    /// @notice Removes liquidity from Uniswap
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param systemCoin address
+    /// @param value uint - Amount of LP tokens to remove
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value, uint[2] memory minTokenAmounts) public returns (uint amountA, uint amountB) {
         DSTokenLike(getWethPair(uniswapRouter, systemCoin)).transferFrom(msg.sender, address(this), value);
         return _removeLiquidityUniswap(uniswapRouter, systemCoin, value, msg.sender, minTokenAmounts);
     }
 
+    /// @notice Withdraws from liquidity mining pool and removes liquidity from Uniswap
+    /// @param coinJoin address    
+    /// @param incentives address - Liquidity mining pool
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function withdrawAndRemoveLiquidity(address coinJoin, address incentives, uint value, address uniswapRouter, uint[2] memory minTokenAmounts) public returns (uint amountA, uint amountB) {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
@@ -1802,6 +2073,13 @@ contract GebProxyIncentivesActions is Common {
         return _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), value, msg.sender, minTokenAmounts);
     }
 
+    /// @notice Withdraws from liquidity mining pool, removes liquidity from Uniswap and repays debt
+    /// @param manager address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param incentives address - Liquidity mining pool
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function withdrawRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, uint value, address uniswapRouter, uint[2] memory minTokenAmounts) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
@@ -1814,7 +2092,16 @@ contract GebProxyIncentivesActions is Common {
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         msg.sender.call{value: address(this).balance}("");
     }
-
+    /// @notice Withdraws from liquidity mining pool, removes liquidity from Uniswap, repays debt and frees ETH
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param incentives address - Liquidity mining pool
+    /// @param valueToWithdraw uint - value to withdraw from liquidity mining pool
+    /// @param ethToFree uint - Amount of eth to be freed
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function withdrawRemoveLiquidityRepayDebtFreeETH(address manager, address ethJoin, address coinJoin, uint safe, address incentives, uint valueToWithdraw, uint ethToFree, address uniswapRouter, uint[2] memory minTokenAmounts) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
@@ -1828,6 +2115,11 @@ contract GebProxyIncentivesActions is Common {
         msg.sender.call{value: address(this).balance}("");
     }
 
+    /// @notice Exits from liquidity mining pool and removes liquidity from Uniswap
+    /// @param coinJoin address    
+    /// @param incentives address - Liquidity mining pool
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function exitAndRemoveLiquidity(address coinJoin, address incentives, address uniswapRouter, uint[2] memory minTokenAmounts) public returns (uint amountA, uint amountB) {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
@@ -1837,7 +2129,15 @@ contract GebProxyIncentivesActions is Common {
         return _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), lpToken.balanceOf(address(this)), msg.sender, minTokenAmounts);
     }
 
+    /// @notice Exits from liquidity mining pool, removes liquidity from Uniswap and repays debt
+    /// @param manager address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param incentives address - Liquidity mining pool
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)    
     function exitRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, address uniswapRouter, uint[2] memory minTokenAmounts) public {
+
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
@@ -1850,7 +2150,15 @@ contract GebProxyIncentivesActions is Common {
         _repayDebt(manager, coinJoin, safe, systemCoin.balanceOf(address(this)));
         msg.sender.call{value: address(this).balance}("");
     }
-
+    /// @notice Exits from liquidity mining pool, removes liquidity from Uniswap, repays debt and frees ETH
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param incentives address - Liquidity mining pool
+    /// @param ethToFree uint - Amount of eth to be freed
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function exitRemoveLiquidityRepayDebtFreeETH(address manager, address ethJoin, address coinJoin, uint safe, address incentives, uint ethToFree, address uniswapRouter, uint[2] memory minTokenAmounts) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
@@ -1863,7 +2171,9 @@ contract GebProxyIncentivesActions is Common {
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         msg.sender.call{value: address(this).balance}("");
     }
-
+    /// @notice Returns the address of a token-weth pair
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param token address of the token
     function getWethPair(address uniswapRouter, address token) public view returns (address) {
         IUniswapV2Router02 router = IUniswapV2Router02(uniswapRouter);
         IUniswapV2Factory factory = IUniswapV2Factory(router.factory());
