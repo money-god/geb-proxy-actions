@@ -130,7 +130,7 @@ abstract contract GebIncentivesLike {
     function withdraw(uint256 amount) virtual public;
     function exit() virtual public;
     function balanceOf(address account) virtual public view returns (uint256);
-    function getLockedReward(address account, uint campaignId, uint timestamp) virtual external;
+    function getLockedReward(address account, uint campaignId) virtual external;
     function getReward(uint campaignId) virtual public;
 
 }
@@ -1757,10 +1757,10 @@ contract GebProxyIncentivesActions is Common {
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
     }
 
-    function getLockedReward(address incentives, uint campaignId, uint timestamp) public {
+    function getLockedReward(address incentives, uint campaignId) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
-        incentivesContract.getLockedReward(address(this), campaignId, timestamp);
+        incentivesContract.getLockedReward(address(this), campaignId);
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
     }
 

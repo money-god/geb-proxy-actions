@@ -277,8 +277,8 @@ contract ProxyCalls {
         proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("harvestReward(address,uint256)", pool, campaign));
     }
 
-    function getLockedReward(address pool, uint campaign, uint timestamp) public {
-        proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("getLockedReward(address,uint256,uint256)", pool, campaign, timestamp));
+    function getLockedReward(address pool, uint campaign) public {
+        proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("getLockedReward(address,uint256)", pool, campaign));
     }
 
     function exitMine(address pool) public {
@@ -1605,11 +1605,10 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertTrue(incentives.balanceOf(address(proxy)) > 0);
         hevm.warp(now + 12 days); // campaign over
         this.harvestReward(address(incentives), 1);
-        uint harvestTime = block.timestamp;
         assertEq(incentives.rewardToken().balanceOf(address(proxy)), 0);
 
         hevm.warp(now + 90 days);
-        this.getLockedReward(address(incentives), 1, harvestTime);
+        this.getLockedReward(address(incentives), 1);
 
         assertTrue(incentives.rewardToken().balanceOf(address(this)) > 9.9999 ether);
     }
