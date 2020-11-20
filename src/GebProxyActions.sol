@@ -2184,22 +2184,27 @@ contract GebProxyIncentivesActions is Common {
 contract GebProxyLeverageActions is Common {
     // Internal functions
 
+    /// @notice Safe subtraction
+    /// @dev Reverts on overflows
     function subtract(uint x, uint y) internal pure returns (uint z) {
         require((z = x - y) <= x, "sub-overflow");
     }
 
+    /// @notice Safe conversion uint -> int
+    /// @dev Reverts on overflows
     function toInt(uint x) internal pure returns (int y) {
         y = int(x);
         require(y >= 0, "int-overflow");
     }
 
+    /// @notice Converts a wad (18 decimal places) to rad (45 decimal places)
     function toRad(uint wad) internal pure returns (uint rad) {
         rad = multiply(wad, 10 ** 27);
     }
 
+    /// @notice For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
+    /// @dev Adapters will automatically handle the difference of precision
     function convertTo18(address collateralJoin, uint256 amt) internal returns (uint256 wad) {
-        // For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
-        // Adapters will automatically handle the difference of precision
         uint decimals = CollateralJoinLike(collateralJoin).decimals();
         wad = amt;
         if (decimals < 18) {
@@ -2210,6 +2215,12 @@ contract GebProxyLeverageActions is Common {
         }
     }
 
+    /// @notice Gets delta debt generated (Total Safe debt minus available safeHandler COIN balance)
+    /// @param safeEngine address
+    /// @param taxCollector address
+    /// @param safeHandler address
+    /// @param collateralType bytes32
+    /// @return deltaDebt
     function _getGeneratedDeltaDebt(
         address safeEngine,
         address taxCollector,
@@ -2232,6 +2243,12 @@ contract GebProxyLeverageActions is Common {
         }
     }
 
+    /// @notice Gets repaid delta debt generated (rate adjusted debt)
+    /// @param safeEngine address
+    /// @param coin uint amount
+    /// @param safe uint - safeId
+    /// @param collateralType bytes32
+        /// @return deltaDebt
     function _getRepaidDeltaDebt(
         address safeEngine,
         uint coin,
@@ -2249,6 +2266,12 @@ contract GebProxyLeverageActions is Common {
         deltaDebt = uint(deltaDebt) <= generatedDebt ? - deltaDebt : - toInt(generatedDebt);
     }
 
+    /// @notice Gets repaid debt (rate adjusted rate minus COIN balance available in usr's address)
+    /// @param safeEngine address
+    /// @param usr address
+    /// @param safe uint
+    /// @param collateralType address
+    /// @return wad
     function _getRepaidAlDebt(
         address safeEngine,
         address usr,
@@ -2269,6 +2292,13 @@ contract GebProxyLeverageActions is Common {
         wad = multiply(wad, RAY) < rad ? wad + 1 : wad;
     }
 
+    /// @notice Generates Debt (and sends coin balance to address to)
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param safe uint
+    /// @param wad uint - amount of debt to be generated
+    /// @param to address - receiver of the balance of generated COIN
     function _generateDebt(address manager, address taxCollector, address coinJoin, uint safe, uint wad, address to) internal {
         address safeHandler = ManagerLike(manager).safes(safe);
         address safeEngine = ManagerLike(manager).safeEngine();
@@ -2285,6 +2315,12 @@ contract GebProxyLeverageActions is Common {
         CoinJoinLike(coinJoin).exit(to, wad);
     }
 
+    /// @notice Generates Debt (and sends coin balance to address to)
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param safe uint
+    /// @param value uint - amount of ETH to be locked in the Safe. 
+    /// @dev Proxy needs to have enough balance (> value), public functions should handle this.
     function _lockETH(
         address manager,
         address ethJoin,
@@ -2304,6 +2340,11 @@ contract GebProxyLeverageActions is Common {
         );
     }
 
+    /// @notice Repays debt
+    /// @param manager address
+    /// @param coinJoin address
+    /// @param safe uint 
+    /// @param wad uint - amount of debt to be repayed
     function _repayDebt(
         address manager,
         address coinJoin,
@@ -2335,6 +2376,13 @@ contract GebProxyLeverageActions is Common {
         }
     }
 
+    /// @notice Repays debt and frees collateral ETH
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param safe uint 
+    /// @param collateralWad uint - amount of ETH to free
+    /// @param deltaWad uint - amount of debt to be repayed
     function _repayDebtAndFreeETH(
         address manager,
         address ethJoin,
@@ -2361,6 +2409,14 @@ contract GebProxyLeverageActions is Common {
         CollateralJoinLike(ethJoin).collateral().withdraw(collateralWad);
     }
 
+    /// @notice Initiates a flashSwap
+    /// @param _tokenBorrow address
+    /// @param _amount uint
+    /// @param _tokenPay address
+    /// @param _data bytes 
+    /// @param uniswapPair address - Uniswap pair address
+    /// @param weth address - Address of weth
+    /// @param proxy address - Proxy contract that contains logic for receiving the Uniswap callback
     function _startSwap(address _tokenBorrow, uint256 _amount, address _tokenPay, bytes memory _data, address uniswapPair, address weth, address proxy) internal {
         require(_tokenBorrow == address(0) || _tokenPay == address(0), "only eth/token or token/eth swaps valid");
         bool isBorrowingEth;
@@ -2398,6 +2454,10 @@ contract GebProxyLeverageActions is Common {
     }
 
     // @notice Function is called by the Uniswap V2 pair's `swap` function
+    /// @param _sender address - Initiator of the flashSwap
+    /// @param _amount0 uint
+    /// @param _amount1 uint
+    /// @param _data bytes 
     function uniswapV2Call(address _sender, uint _amount0, uint _amount1, bytes calldata _data) external {
         require(_sender == address(this), "only this contract may initiate");
         DSAuth(address(this)).setAuthority(DSAuthority(address(0)));
@@ -2444,14 +2504,26 @@ contract GebProxyLeverageActions is Common {
     }
 
     // Public functions
+
+    /// @notice ERC20 transfer
+    /// @param collateral address - address of ERC20 collateral
+    /// @param dst address - Transfer destination
+    /// @param amt address - Amount to transfer
     function transfer(address collateral, address dst, uint amt) public {
         CollateralLike(collateral).transfer(dst, amt);
     }
 
+    /// @notice Joins the system with the full msg.value
+    /// @param apt address - Address of the adapter
+    /// @param safe uint - Safe Id
     function ethJoin_join(address apt, address safe) public payable {
         ethJoin_join(apt, safe, msg.value);
     }
 
+    /// @notice Joins the system with the a specified value
+    /// @param apt address - Address of the adapter
+    /// @param safe uint - Safe Id
+    /// @param value uint - Value to join
     function ethJoin_join(address apt, address safe, uint value) public payable {
         // Wraps ETH in WETH
         CollateralJoinLike(apt).collateral().deposit{value: value}();
@@ -2461,20 +2533,30 @@ contract GebProxyLeverageActions is Common {
         CollateralJoinLike(apt).join(safe, value);
     }
 
+    /// @notice Approves an address to modify the Safe
+    /// @param safeEngine address
+    /// @param usr address - Address allowed to modify Safe
     function approveSAFEModification(
-        address obj,
+        address safeEngine,
         address usr
     ) public {
-        ApproveSAFEModificationLike(obj).approveSAFEModification(usr);
+        ApproveSAFEModificationLike(safeEngine).approveSAFEModification(usr);
     }
 
+    /// @notice Denies an address to modify the Safe
+    /// @param safeEngine address
+    /// @param usr address - Address disallowed to modify Safe
     function denySAFEModification(
-        address obj,
+        address safeEngine,
         address usr
     ) public {
-        ApproveSAFEModificationLike(obj).denySAFEModification(usr);
+        ApproveSAFEModificationLike(safeEngine).denySAFEModification(usr);
     }
 
+    /// @notice Opens a brand new Safe
+    /// @param manager address - Safe Manager
+    /// @param collateralType bytes32 - collateral type
+    /// @param usr address - Owner of the safe
     function openSAFE(
         address manager,
         bytes32 collateralType,
@@ -2483,6 +2565,10 @@ contract GebProxyLeverageActions is Common {
         safe = ManagerLike(manager).openSAFE(collateralType, usr);
     }
 
+    /// @notice Transfer the ownership of a proxy owned Safe
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param usr address - Owner of the safe
     function transferSAFEOwnership(
         address manager,
         uint safe,
@@ -2491,6 +2577,11 @@ contract GebProxyLeverageActions is Common {
         ManagerLike(manager).transferSAFEOwnership(safe, usr);
     }
 
+    /// @notice Transfer the ownership to a new proxy owned by a different address
+    /// @param proxyRegistry address - Safe Manager
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param dst address - Owner of the new proxy
     function transferSAFEOwnershipToProxy(
         address proxyRegistry,
         address manager,
@@ -2514,6 +2605,11 @@ contract GebProxyLeverageActions is Common {
         transferSAFEOwnership(manager, safe, proxy);
     }
 
+    /// @notice Allow/disallow a usr address to manage the safe
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param usr address - usr address
+    /// uint ok - 1 for allowed
     function allowSAFE(
         address manager,
         uint safe,
@@ -2523,6 +2619,10 @@ contract GebProxyLeverageActions is Common {
         ManagerLike(manager).allowSAFE(safe, usr, ok);
     }
 
+    /// @notice Allow/disallow a usr address to quit to the sender handler
+    /// @param manager address - Safe Manager
+    /// @param usr address - usr address
+    /// uint ok - 1 for allowed
     function allowHandler(
         address manager,
         address usr,
@@ -2531,6 +2631,11 @@ contract GebProxyLeverageActions is Common {
         ManagerLike(manager).allowHandler(usr, ok);
     }
 
+    /// @notice Transfer wad amount of safe collateral from the safe address to a dst address.
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param dst address - destination address
+    /// uint wad - amount
     function transferCollateral(
         address manager,
         uint safe,
@@ -2540,6 +2645,11 @@ contract GebProxyLeverageActions is Common {
         ManagerLike(manager).transferCollateral(safe, dst, wad);
     }
 
+    /// @notice Transfer rad amount of COIN from the safe address to a dst address.
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param dst address - destination address
+    /// uint rad - amount
     function transferInternalCoins(
         address manager,
         uint safe,
@@ -2549,6 +2659,12 @@ contract GebProxyLeverageActions is Common {
         ManagerLike(manager).transferInternalCoins(safe, dst, rad);
     }
 
+    
+    /// @notice Modify a SAFE's collateralization ratio while keeping the generated COIN or collateral freed in the SAFE handler address.
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param deltaCollateral - int
+    /// @param deltaDebt - int
     function modifySAFECollateralization(
         address manager,
         uint safe,
@@ -2558,6 +2674,10 @@ contract GebProxyLeverageActions is Common {
         ManagerLike(manager).modifySAFECollateralization(safe, deltaCollateral, deltaDebt);
     }
 
+    /// @notice Quit the system, migrating the safe (lockedCollateral, generatedDebt) to a different dst handler
+    /// @param manager address - Safe Manager
+    /// @param safe uint - Safe Id
+    /// @param dst - destination handler 
     function quitSystem(
         address manager,
         uint safe,
@@ -2566,6 +2686,10 @@ contract GebProxyLeverageActions is Common {
         ManagerLike(manager).quitSystem(safe, dst);
     }
 
+    /// @notice Import a position from src handler to the handler owned by safe
+    /// @param manager address - Safe Manager
+    /// @param src - source handler 
+    /// @param safe uint - Safe Id
     function enterSystem(
         address manager,
         address src,
@@ -2574,6 +2698,10 @@ contract GebProxyLeverageActions is Common {
         ManagerLike(manager).enterSystem(src, safe);
     }
 
+    /// @notice Move a position from safeSrc handler to the safeDst handler
+    /// @param manager address - Safe Manager
+    /// @param safeSrc uint - Source Safe Id
+    /// @param safeDst uint - Destination Safe Id
     function moveSAFE(
         address manager,
         uint safeSrc,
@@ -2582,34 +2710,23 @@ contract GebProxyLeverageActions is Common {
         ManagerLike(manager).moveSAFE(safeSrc, safeDst);
     }
 
+    /// @notice Lock ETH (msg.value) as collateral in safe
+    /// @param manager address - Safe Manager
+    /// @param ethJoin address
+    /// @param safe uint - Safe Id
     function lockETH(
         address manager,
         address ethJoin,
         uint safe
     ) public payable {
-        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
-        ethJoin_join(ethJoin, address(this));
-        // Locks WETH amount into the SAFE
-        SAFEEngineLike(ManagerLike(manager).safeEngine()).modifySAFECollateralization(
-            ManagerLike(manager).collateralTypes(safe),
-            ManagerLike(manager).safes(safe),
-            address(this),
-            address(this),
-            toInt(msg.value),
-            0
-        );
+        _lockETH(manager, ethJoin, safe, msg.value);
     }
 
-    function safeLockETH(
-        address manager,
-        address ethJoin,
-        uint safe,
-        address owner
-    ) public payable {
-        require(ManagerLike(manager).ownsSAFE(safe) == owner, "owner-missmatch");
-        lockETH(manager, ethJoin, safe);
-    }
-
+    /// @notice Free ETH (wad) from safe and sends it to msg.sender
+    /// @param manager address - Safe Manager
+    /// @param ethJoin address
+    /// @param safe uint - Safe Id
+    /// @param wad uint - Amount
     function freeETH(
         address manager,
         address ethJoin,
@@ -2628,6 +2745,12 @@ contract GebProxyLeverageActions is Common {
         msg.sender.transfer(wad);
     }
 
+
+    /// @notice Exits ETH (wad) from balance available in the handler
+    /// @param manager address - Safe Manager
+    /// @param ethJoin address
+    /// @param safe uint - Safe Id
+    /// @param wad uint - Amount
     function exitETH(
         address manager,
         address ethJoin,
@@ -2644,6 +2767,12 @@ contract GebProxyLeverageActions is Common {
         msg.sender.transfer(wad);
     }
 
+    /// @notice Generates debt and sends COIN amount to msg.sender
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param wad uint - Amount
     function generateDebt(
         address manager,
         address taxCollector,
@@ -2654,89 +2783,27 @@ contract GebProxyLeverageActions is Common {
         _generateDebt(manager, taxCollector, coinJoin, safe, wad, msg.sender);
     }
 
+    /// @notice Repays debt
+    /// @param manager address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param wad uint - Amount
     function repayDebt(
         address manager,
         address coinJoin,
         uint safe,
         uint wad
     ) public {
-        address safeEngine = ManagerLike(manager).safeEngine();
-        address safeHandler = ManagerLike(manager).safes(safe);
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-
-        address own = ManagerLike(manager).ownsSAFE(safe);
-        if (own == address(this) || ManagerLike(manager).safeCan(own, safe, address(this)) == 1) {
-            // Joins COIN amount into the safeEngine
-            coinJoin_join(coinJoin, safeHandler, wad);
-            // // Paybacks debt to the SAFE
-            modifySAFECollateralization(manager, safe, 0, _getRepaidDeltaDebt(safeEngine, SAFEEngineLike(safeEngine).coinBalance(safeHandler), safeHandler, collateralType));
-        } else {
-             // Joins COIN amount into the safeEngine
-            coinJoin_join(coinJoin, address(this), wad);
-            // Paybacks debt to the SAFE
-            SAFEEngineLike(safeEngine).modifySAFECollateralization(
-                collateralType,
-                safeHandler,
-                address(this),
-                address(this),
-                0,
-                _getRepaidDeltaDebt(safeEngine, wad * RAY, safeHandler, collateralType)
-            );
-        }
+        _repayDebt(manager, coinJoin, safe, wad);
     }
 
-    function safeRepayDebt(
-        address manager,
-        address coinJoin,
-        uint safe,
-        uint wad,
-        address owner
-    ) public {
-        require(ManagerLike(manager).ownsSAFE(safe) == owner, "owner-missmatch");
-        repayDebt(manager, coinJoin, safe, wad);
-    }
-
-    function repayAllDebt(
-        address manager,
-        address coinJoin,
-        uint safe
-    ) public {
-        address safeEngine = ManagerLike(manager).safeEngine();
-        address safeHandler = ManagerLike(manager).safes(safe);
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safeHandler);
-
-        address own = ManagerLike(manager).ownsSAFE(safe);
-        if (own == address(this) || ManagerLike(manager).safeCan(own, safe, address(this)) == 1) {
-            // Joins COIN amount into the safeEngine
-            coinJoin_join(coinJoin, safeHandler, _getRepaidAlDebt(safeEngine, safeHandler, safeHandler, collateralType));
-            // Paybacks debt to the SAFE
-            modifySAFECollateralization(manager, safe, 0, -int(generatedDebt));
-        } else {
-            // Joins COIN amount into the safeEngine
-            coinJoin_join(coinJoin, address(this), _getRepaidAlDebt(safeEngine, address(this), safeHandler, collateralType));
-            // Paybacks debt to the SAFE
-            SAFEEngineLike(safeEngine).modifySAFECollateralization(
-                collateralType,
-                safeHandler,
-                address(this),
-                address(this),
-                0,
-                -int(generatedDebt)
-            );
-        }
-    }
-
-    function safeRepayAllDebt(
-        address manager,
-        address coinJoin,
-        uint safe,
-        address owner
-    ) public {
-        require(ManagerLike(manager).ownsSAFE(safe) == owner, "owner-missmatch");
-        repayAllDebt(manager, coinJoin, safe);
-    }
-
+    /// @notice Locks Eth, generates debt and sends COIN amount (deltaWad) to msg.sender
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param deltaWad uint - Amount
     function lockETHAndGenerateDebt(
         address manager,
         address taxCollector,
@@ -2745,23 +2812,16 @@ contract GebProxyLeverageActions is Common {
         uint safe,
         uint deltaWad
     ) public payable {
-        address safeHandler = ManagerLike(manager).safes(safe);
-        address safeEngine = ManagerLike(manager).safeEngine();
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
-        ethJoin_join(ethJoin, safeHandler);
-        // Locks WETH amount into the SAFE and generates debt
-        modifySAFECollateralization(manager, safe, toInt(msg.value), _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, deltaWad));
-        // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
-        transferInternalCoins(manager, safe, address(this), toRad(deltaWad));
-        // Allows adapter to access to proxy's COIN balance in the safeEngine
-        if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
-            SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
-        }
-        // Exits COIN to the user's wallet as a token
-        CoinJoinLike(coinJoin).exit(msg.sender, deltaWad);
+        _lockETH(manager, ethJoin, safe, deltaWad);
+        _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, msg.sender);
     }
 
+    /// @notice Opens Safe, locks Eth, generates debt and sends COIN amount (deltaWad) to msg.sender
+    /// @param manager address
+    /// @param taxCollector address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param deltaWad uint - Amount
     function openLockETHAndGenerateDebt(
         address manager,
         address taxCollector,
@@ -2774,6 +2834,13 @@ contract GebProxyLeverageActions is Common {
         lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, safe, deltaWad);
     }
 
+    /// @notice Repays debt and frees ETH (sends it to msg.sender)
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param coinJoin address
+    /// @param safe uint - Safe Id
+    /// @param collateralWad uint - Amount of collateral to free
+    /// @param deltaWad uint - Amount of debt to repay
     function repayDebtAndFreeETH(
         address manager,
         address ethJoin,
@@ -2782,57 +2849,20 @@ contract GebProxyLeverageActions is Common {
         uint collateralWad,
         uint deltaWad
     ) public {
-        address safeHandler = ManagerLike(manager).safes(safe);
-        // Joins COIN amount into the safeEngine
-        coinJoin_join(coinJoin, safeHandler, deltaWad);
-        // Paybacks debt to the SAFE and unlocks WETH amount from it
-        modifySAFECollateralization(
-            manager,
-            safe,
-            -toInt(collateralWad),
-            _getRepaidDeltaDebt(ManagerLike(manager).safeEngine(), SAFEEngineLike(ManagerLike(manager).safeEngine()).coinBalance(safeHandler), safeHandler, ManagerLike(manager).collateralTypes(safe))
-        );
-        // Moves the amount from the SAFE handler to proxy's address
-        transferCollateral(manager, safe, address(this), collateralWad);
-        // Exits WETH amount to proxy address as a token
-        CollateralJoinLike(ethJoin).exit(address(this), collateralWad);
-        // Converts WETH to ETH
-        CollateralJoinLike(ethJoin).collateral().withdraw(collateralWad);
+        _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, collateralWad, deltaWad);
         // Sends ETH back to the user's wallet
         msg.sender.transfer(collateralWad);
     }
 
-    function repayAllDebtAndFreeETH(
-        address manager,
-        address ethJoin,
-        address coinJoin,
-        uint safe,
-        uint collateralWad
-    ) public {
-        address safeEngine = ManagerLike(manager).safeEngine();
-        address safeHandler = ManagerLike(manager).safes(safe);
-        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
-        (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safeHandler);
-
-        // Joins COIN amount into the safeEngine
-        coinJoin_join(coinJoin, safeHandler, _getRepaidAlDebt(safeEngine, safeHandler, safeHandler, collateralType));
-        // Paybacks debt to the SAFE and unlocks WETH amount from it
-        modifySAFECollateralization(
-            manager,
-            safe,
-            -toInt(collateralWad),
-            -int(generatedDebt)
-        );
-        // Moves the amount from the SAFE handler to proxy's address
-        transferCollateral(manager, safe, address(this), collateralWad);
-        // Exits WETH amount to proxy address as a token
-        CollateralJoinLike(ethJoin).exit(address(this), collateralWad);
-        // Converts WETH to ETH
-        CollateralJoinLike(ethJoin).collateral().withdraw(collateralWad);
-        // Sends ETH back to the user's wallet
-        msg.sender.transfer(collateralWad);
-    }
-
+    /// @notice Opens Safe, locks Eth, and leverages it to a user defined ratio
+    /// @param uniswapV2Pair address
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param weth address
+    /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
+    /// @param leverage uint - leverage ratio, 3 decimal places, 2.5 == 2500
     function openLockETHLeverage(
         address uniswapV2Pair,
         address manager,
@@ -2841,7 +2871,7 @@ contract GebProxyLeverageActions is Common {
         address coinJoin,
         address weth,
         address callbackProxy,
-        uint leverage // 3 decimal places, 2.5 == 2500
+        uint leverage 
     ) public payable returns (uint safe) {
         safe = openSAFE(manager, "ETH", address(this));
         _lockETH(manager, ethJoin, safe, msg.value);
@@ -2858,6 +2888,16 @@ contract GebProxyLeverageActions is Common {
         );
     }
 
+    /// @notice Locks Eth, and leverages it to a user defined ratio
+    /// @param uniswapV2Pair address
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param weth address
+    /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
+    /// @param safe uint - Safe Id
+    /// @param leverage uint - leverage ratio, 3 decimal places, 2.5 == 2500
     function lockETHLeverage(
         address uniswapV2Pair,
         address manager,
@@ -2883,6 +2923,16 @@ contract GebProxyLeverageActions is Common {
         );
     }
 
+    /// @notice Leverages a safe to a user defined ratio
+    /// @param uniswapV2Pair address
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param weth address
+    /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
+    /// @param safe uint - Safe Id
+    /// @param leverage uint - leverage ratio, 3 decimal places, 2.5 == 2500
     function flashLeverage(
         address uniswapV2Pair,
         address manager,
@@ -2907,6 +2957,10 @@ contract GebProxyLeverageActions is Common {
         _startSwap(address(0), ((collateralBalance * leverage) / 1000) - collateralBalance, address(CoinJoinLike(coinJoin).systemCoin()), data, uniswapV2Pair, weth, callbackProxy);
     }
 
+    /// @notice FlashLeverage Callback, this function is called by the FlashSwap proxy with the borrowed funds in hands
+    /// @param collateralAmount uint - amont of collateral borrowed
+    /// @param amountToRepay uint - amount to repay in COIN
+    /// @param data bytes - data passed back from Uniswap
     function flashLeverageCallback(uint collateralAmount, uint amountToRepay, bytes memory data) internal {
         require(collateralAmount == address(this).balance, "funds not here");
 
@@ -2922,6 +2976,16 @@ contract GebProxyLeverageActions is Common {
         _generateDebt(manager, taxCollector, coinJoin, safe, amountToRepay, address(this));
     }
 
+    /// @notice Will repay all debt and free ETH (sends it to msg.sender)
+    /// @param uniswapV2Pair address
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param weth address
+    /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
+    /// @param safe uint - Safe Id
+    /// @param amountToFree uint - amount of ETH to free
     function flashDeleverageFreeETH(
         address uniswapV2Pair,
         address manager,
@@ -2946,6 +3010,15 @@ contract GebProxyLeverageActions is Common {
         freeETH(manager, ethJoin, safe, amountToFree);
     }
 
+    /// @notice Will repay all debt using a flashSwap
+    /// @param uniswapV2Pair address
+    /// @param manager address
+    /// @param ethJoin address
+    /// @param taxCollector address
+    /// @param coinJoin address
+    /// @param weth address
+    /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
+    /// @param safe uint - Safe Id
     function flashDeleverage(
         address uniswapV2Pair,
         address manager,
@@ -2970,6 +3043,10 @@ contract GebProxyLeverageActions is Common {
         _startSwap(address(CoinJoinLike(coinJoin).systemCoin()), generatedDebt, address(0), data, uniswapV2Pair, weth, callbackProxy);
     }
 
+    /// @notice FlashDeleverage Callback, this function is called by the FlashSwap proxy with the borrowed funds in hands
+    /// @param coinAmount uint - amont of COIN borrowed
+    /// @param amountToRepay uint - amount to repay in ETH
+    /// @param data bytes - data passed back from Uniswap
     function flashDeleverageCallback(uint coinAmount, uint amountToRepay, bytes memory data) internal {
         // decode data
         (
