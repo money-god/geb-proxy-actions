@@ -13,7 +13,7 @@ import {DSValue} from "ds-value/value.sol";
 import {GebSafeManager} from "geb-safe-manager/GebSafeManager.sol";
 import {GetSafes} from "geb-safe-manager/GetSafes.sol";
 import {GebProxyRegistry, DSProxyFactory, DSProxy} from "geb-proxy-registry/GebProxyRegistry.sol";
-import {GebUniswapRollingDistributionIncentives} from "geb-incentives/uniswap/GebUniswapRollingDistributionIncentives.sol";
+import {RollingDistributionIncentives} from "geb-incentives/uniswap/RollingDistributionIncentives.sol";
 
 import "../uni/UniswapV2Factory.sol";
 import "../uni/UniswapV2Pair.sol";
@@ -1439,7 +1439,7 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
     GebSafeManager manager;
 
     GebProxyRegistry registry;
-    GebUniswapRollingDistributionIncentives incentives;
+    RollingDistributionIncentives incentives;
     DSToken rewardToken;
 
     UniswapV2Factory uniswapFactory;
@@ -1482,7 +1482,7 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         raiETHPair.transfer(address(0), raiETHPair.balanceOf(address(this)));
 
         // Setup Incentives
-        incentives = new GebUniswapRollingDistributionIncentives(address(raiETHPair), address(col));
+        incentives = new RollingDistributionIncentives(address(raiETHPair), address(col));
         col.mint(address(incentives), 20 ether);
         incentives.newCampaign(10 ether, now + 1, 12 days, 90 days, 500);
         hevm.warp(now + 1);
@@ -1779,7 +1779,7 @@ contract GebProxyLeverageActionsTest is GebDeployTestBase, ProxyCalls {
     GebSafeManager manager;
 
     GebProxyRegistry registry;
-    GebUniswapRollingDistributionIncentives incentives;
+    RollingDistributionIncentives incentives;
     DSToken rewardToken;
 
     UniswapV2Factory uniswapFactory;
@@ -1823,7 +1823,7 @@ contract GebProxyLeverageActionsTest is GebDeployTestBase, ProxyCalls {
         raiETHPair.transfer(address(0), raiETHPair.balanceOf(address(this)));
 
         // Setup Incentives
-        incentives = new GebUniswapRollingDistributionIncentives(address(raiETHPair), address(col));
+        incentives = new RollingDistributionIncentives(address(raiETHPair), address(col));
         col.mint(address(incentives), 20 ether);
         incentives.newCampaign(10 ether, now + 1, 12 days, 90 days, 500);
         hevm.warp(now + 1);
