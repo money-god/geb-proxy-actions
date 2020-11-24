@@ -1285,7 +1285,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param manager address
     /// @param ethJoin address
     /// @param safe uint
-    /// @param value uint - amount of ETH to be locked in the Safe. 
+    /// @param value uint - amount of ETH to be locked in the Safe.
     /// @dev Proxy needs to have enough balance (> value), public functions should handle this.
     function _lockETH(
         address manager,
@@ -1358,7 +1358,7 @@ contract GebProxyIncentivesActions is Common {
     /// @notice Repays debt
     /// @param manager address
     /// @param coinJoin address
-    /// @param safe uint 
+    /// @param safe uint
     /// @param wad uint - amount of debt to be repayed
     function _repayDebt(
         address manager,
@@ -1395,7 +1395,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param manager address
     /// @param ethJoin address
     /// @param coinJoin address
-    /// @param safe uint 
+    /// @param safe uint
     /// @param collateralWad uint - amount of ETH to free
     /// @param deltaWad uint - amount of debt to be repayed
     function _repayDebtAndFreeETH(
@@ -1580,7 +1580,7 @@ contract GebProxyIncentivesActions is Common {
         ManagerLike(manager).transferInternalCoins(safe, dst, rad);
     }
 
-    
+
     /// @notice Modify a SAFE's collateralization ratio while keeping the generated COIN or collateral freed in the SAFE handler address.
     /// @param manager address - Safe Manager
     /// @param safe uint - Safe Id
@@ -1598,7 +1598,7 @@ contract GebProxyIncentivesActions is Common {
     /// @notice Quit the system, migrating the safe (lockedCollateral, generatedDebt) to a different dst handler
     /// @param manager address - Safe Manager
     /// @param safe uint - Safe Id
-    /// @param dst - destination handler 
+    /// @param dst - destination handler
     function quitSystem(
         address manager,
         uint safe,
@@ -1609,7 +1609,7 @@ contract GebProxyIncentivesActions is Common {
 
     /// @notice Import a position from src handler to the handler owned by safe
     /// @param manager address - Safe Manager
-    /// @param src - source handler 
+    /// @param src - source handler
     /// @param safe uint - Safe Id
     function enterSystem(
         address manager,
@@ -1781,6 +1781,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param ethJoin address
     /// @param coinJoin address
     /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param collateralType bytes32 - The ETH type used to generate debt
     /// @param deltaWad uint - Amount of debt to generate
     /// @param liquidityWad uint - Amount of ETH to be provided as liquidity (the remainder of msg.value will be used to collateralize the Safe)
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
@@ -1790,11 +1791,12 @@ contract GebProxyIncentivesActions is Common {
         address ethJoin,
         address coinJoin,
         address uniswapRouter,
+        bytes32 collateralType,
         uint deltaWad,
         uint liquidityWad,
         uint[2] memory minTokenAmounts
     ) public payable returns (uint safe) {
-        safe = openSAFE(manager, "ETH", address(this));
+        safe = openSAFE(manager, collateralType, address(this));
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
 
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
@@ -1849,8 +1851,9 @@ contract GebProxyIncentivesActions is Common {
     /// @param coinJoin address
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param incentives address - Liquidity mining pool
-    /// @param deltaWad uint - Amount of debt to generate
-    /// @param liquidityWad uint - Amount of ETH to be provided as liquidity (the remainder of msg.value will be used to collateralize the Safe)
+    /// @param collateralType bytes32 - The ETH type used to generate debt
+    /// @param deltaWad uint256 - Amount of debt to generate
+    /// @param liquidityWad uint256 - Amount of ETH to be provided as liquidity (the remainder of msg.value will be used to collateralize the Safe)
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function openLockETHGenerateDebtProvideLiquidityStake(
         address manager,
@@ -1859,11 +1862,12 @@ contract GebProxyIncentivesActions is Common {
         address coinJoin,
         address uniswapRouter,
         address incentives,
-        uint deltaWad,
-        uint liquidityWad,
-        uint[2] memory minTokenAmounts
+        bytes32 collateralType,
+        uint256 deltaWad,
+        uint256 liquidityWad,
+        uint256[2] memory minTokenAmounts
     ) public payable returns (uint safe) {
-        safe = openSAFE(manager, "ETH", address(this));
+        safe = openSAFE(manager, collateralType, address(this));
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
 
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
@@ -2062,7 +2066,7 @@ contract GebProxyIncentivesActions is Common {
     }
 
     /// @notice Withdraws from liquidity mining pool and removes liquidity from Uniswap
-    /// @param coinJoin address    
+    /// @param coinJoin address
     /// @param incentives address - Liquidity mining pool
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
@@ -2116,7 +2120,7 @@ contract GebProxyIncentivesActions is Common {
     }
 
     /// @notice Exits from liquidity mining pool and removes liquidity from Uniswap
-    /// @param coinJoin address    
+    /// @param coinJoin address
     /// @param incentives address - Liquidity mining pool
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
@@ -2135,7 +2139,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param safe uint - Safe Id
     /// @param incentives address - Liquidity mining pool
     /// @param uniswapRouter address - Uniswap V2 Router
-    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)    
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function exitRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, address uniswapRouter, uint[2] memory minTokenAmounts) public {
 
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
@@ -2319,7 +2323,7 @@ contract GebProxyLeverageActions is Common {
     /// @param manager address
     /// @param ethJoin address
     /// @param safe uint
-    /// @param value uint - amount of ETH to be locked in the Safe. 
+    /// @param value uint - amount of ETH to be locked in the Safe.
     /// @dev Proxy needs to have enough balance (> value), public functions should handle this.
     function _lockETH(
         address manager,
@@ -2343,7 +2347,7 @@ contract GebProxyLeverageActions is Common {
     /// @notice Repays debt
     /// @param manager address
     /// @param coinJoin address
-    /// @param safe uint 
+    /// @param safe uint
     /// @param wad uint - amount of debt to be repayed
     function _repayDebt(
         address manager,
@@ -2380,7 +2384,7 @@ contract GebProxyLeverageActions is Common {
     /// @param manager address
     /// @param ethJoin address
     /// @param coinJoin address
-    /// @param safe uint 
+    /// @param safe uint
     /// @param collateralWad uint - amount of ETH to free
     /// @param deltaWad uint - amount of debt to be repayed
     function _repayDebtAndFreeETH(
@@ -2413,7 +2417,7 @@ contract GebProxyLeverageActions is Common {
     /// @param _tokenBorrow address
     /// @param _amount uint
     /// @param _tokenPay address
-    /// @param _data bytes 
+    /// @param _data bytes
     /// @param uniswapPair address - Uniswap pair address
     /// @param weth address - Address of weth
     /// @param proxy address - Proxy contract that contains logic for receiving the Uniswap callback
@@ -2457,7 +2461,7 @@ contract GebProxyLeverageActions is Common {
     /// @param _sender address - Initiator of the flashSwap
     /// @param _amount0 uint
     /// @param _amount1 uint
-    /// @param _data bytes 
+    /// @param _data bytes
     function uniswapV2Call(address _sender, uint _amount0, uint _amount1, bytes calldata _data) external {
         require(_sender == address(this), "only this contract may initiate");
         DSAuth(address(this)).setAuthority(DSAuthority(address(0)));
@@ -2659,7 +2663,7 @@ contract GebProxyLeverageActions is Common {
         ManagerLike(manager).transferInternalCoins(safe, dst, rad);
     }
 
-    
+
     /// @notice Modify a SAFE's collateralization ratio while keeping the generated COIN or collateral freed in the SAFE handler address.
     /// @param manager address - Safe Manager
     /// @param safe uint - Safe Id
@@ -2677,7 +2681,7 @@ contract GebProxyLeverageActions is Common {
     /// @notice Quit the system, migrating the safe (lockedCollateral, generatedDebt) to a different dst handler
     /// @param manager address - Safe Manager
     /// @param safe uint - Safe Id
-    /// @param dst - destination handler 
+    /// @param dst - destination handler
     function quitSystem(
         address manager,
         uint safe,
@@ -2688,7 +2692,7 @@ contract GebProxyLeverageActions is Common {
 
     /// @notice Import a position from src handler to the handler owned by safe
     /// @param manager address - Safe Manager
-    /// @param src - source handler 
+    /// @param src - source handler
     /// @param safe uint - Safe Id
     function enterSystem(
         address manager,
@@ -2862,6 +2866,7 @@ contract GebProxyLeverageActions is Common {
     /// @param coinJoin address
     /// @param weth address
     /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
+    /// @param collateralType bytes32 - The ETH type used to generate debt
     /// @param leverage uint - leverage ratio, 3 decimal places, 2.5 == 2500
     function openLockETHLeverage(
         address uniswapV2Pair,
@@ -2871,9 +2876,10 @@ contract GebProxyLeverageActions is Common {
         address coinJoin,
         address weth,
         address callbackProxy,
-        uint leverage 
+        bytes32 collateralType,
+        uint256 leverage
     ) public payable returns (uint safe) {
-        safe = openSAFE(manager, "ETH", address(this));
+        safe = openSAFE(manager, collateralType, address(this));
         _lockETH(manager, ethJoin, safe, msg.value);
         flashLeverage(
             uniswapV2Pair,
@@ -2883,6 +2889,7 @@ contract GebProxyLeverageActions is Common {
             coinJoin,
             weth,
             callbackProxy,
+            collateralType,
             safe,
             leverage
         );
@@ -2896,6 +2903,7 @@ contract GebProxyLeverageActions is Common {
     /// @param coinJoin address
     /// @param weth address
     /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
+    /// @param collateralType bytes32 - The ETH type used to generate debt
     /// @param safe uint - Safe Id
     /// @param leverage uint - leverage ratio, 3 decimal places, 2.5 == 2500
     function lockETHLeverage(
@@ -2906,6 +2914,7 @@ contract GebProxyLeverageActions is Common {
         address coinJoin,
         address weth,
         address callbackProxy,
+        bytes32 collateralType,
         uint safe,
         uint leverage // 3 decimal places, 2.5 == 2500
     ) public payable {
@@ -2918,6 +2927,7 @@ contract GebProxyLeverageActions is Common {
             coinJoin,
             weth,
             callbackProxy,
+            collateralType,
             safe,
             leverage
         );
@@ -2931,8 +2941,9 @@ contract GebProxyLeverageActions is Common {
     /// @param coinJoin address
     /// @param weth address
     /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
-    /// @param safe uint - Safe Id
-    /// @param leverage uint - leverage ratio, 3 decimal places, 2.5 == 2500
+    /// @param collateralType bytes32 - The ETH type used to generate debt
+    /// @param safe uint256 - Safe Id
+    /// @param leverage uint256 - leverage ratio, 3 decimal places, 2.5 == 2500
     function flashLeverage(
         address uniswapV2Pair,
         address manager,
@@ -2941,23 +2952,31 @@ contract GebProxyLeverageActions is Common {
         address coinJoin,
         address weth,
         address callbackProxy,
-        uint safe,
-        uint leverage // 3 decimal places, 2.5 == 2500
+        bytes32 collateralType,
+        uint256 safe,
+        uint256 leverage // 3 decimal places, 2.5 == 2500
     ) public {
-        (uint collateralBalance,) = SAFEEngineLike(ManagerLike(manager).safeEngine()).safes("ETH", ManagerLike(manager).safes(safe));
+        (uint collateralBalance,) = SAFEEngineLike(ManagerLike(manager).safeEngine()).safes(collateralType, ManagerLike(manager).safes(safe));
 
-        bytes memory data = abi.encode(
-            manager,
-            ethJoin,
-            safe,
-            taxCollector,
-            coinJoin
-        );
         // flashswap
-        _startSwap(address(0), ((collateralBalance * leverage) / 1000) - collateralBalance, address(CoinJoinLike(coinJoin).systemCoin()), data, uniswapV2Pair, weth, callbackProxy);
+        _startSwap(
+          address(0),
+          ((collateralBalance * leverage) / 1000) - collateralBalance,
+          address(CoinJoinLike(coinJoin).systemCoin()),
+          abi.encode(
+              manager,
+              ethJoin,
+              safe,
+              taxCollector,
+              coinJoin
+          ),
+          uniswapV2Pair,
+          weth,
+          callbackProxy
+        );
     }
 
-    /// @notice FlashLeverage Callback, this function is called by the FlashSwap proxy with the borrowed funds in hands
+    /// @notice Flash leverage callback. This function is called by the FlashSwap proxy with the borrowed funds in hands
     /// @param collateralAmount uint - amont of collateral borrowed
     /// @param amountToRepay uint - amount to repay in COIN
     /// @param data bytes - data passed back from Uniswap
@@ -2984,6 +3003,7 @@ contract GebProxyLeverageActions is Common {
     /// @param coinJoin address
     /// @param weth address
     /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
+    /// @param collateralType bytes32 - The ETH type used to generate debt
     /// @param safe uint - Safe Id
     /// @param amountToFree uint - amount of ETH to free
     function flashDeleverageFreeETH(
@@ -2994,6 +3014,7 @@ contract GebProxyLeverageActions is Common {
         address coinJoin,
         address weth,
         address callbackProxy,
+        bytes32 collateralType,
         uint safe,
         uint amountToFree
     ) public {
@@ -3005,6 +3026,7 @@ contract GebProxyLeverageActions is Common {
             coinJoin,
             weth,
             callbackProxy,
+            collateralType,
             safe
         );
         freeETH(manager, ethJoin, safe, amountToFree);
@@ -3018,6 +3040,7 @@ contract GebProxyLeverageActions is Common {
     /// @param coinJoin address
     /// @param weth address
     /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
+    /// @param collateralType bytes32 - The ETH type used to generate debt
     /// @param safe uint - Safe Id
     function flashDeleverage(
         address uniswapV2Pair,
@@ -3027,9 +3050,10 @@ contract GebProxyLeverageActions is Common {
         address coinJoin,
         address weth,
         address callbackProxy,
+        bytes32 collateralType,
         uint safe
     ) public {
-        (,uint generatedDebt) = SAFEEngineLike(ManagerLike(manager).safeEngine()).safes("ETH", ManagerLike(manager).safes(safe));
+        (,uint generatedDebt) = SAFEEngineLike(ManagerLike(manager).safeEngine()).safes(collateralType, ManagerLike(manager).safes(safe));
 
         // encoding data
         bytes memory data = abi.encode(
