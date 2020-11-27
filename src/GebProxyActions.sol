@@ -1145,8 +1145,8 @@ contract GebProxyActionsCoinSavingsAccount is Common {
 }
 
 /// @title Incentives proxy actions
-/// @notice This contract is supposed to be used along a DS-Proxy contract.
-/// @dev These functions meant to be used as a a library for a DSProxy. Some are unsafe if you call them directly.
+/// @notice This contract is supposed to be used alongside a DSProxy contract.
+/// @dev These functions are meant to be used as a a library for a DSProxy. Some are unsafe if you call them directly.
 contract GebProxyIncentivesActions is Common {
     // Internal functions
 
@@ -1970,6 +1970,7 @@ contract GebProxyIncentivesActions is Common {
         DSTokenLike(GebIncentivesLike(incentives).lpToken()).transferFrom(msg.sender, address(this), wad);
         _stakeInMine(incentives, wad);
     }
+
     /// @notice Generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap and stakes LP tokens in Farm
     /// @param manager address
     /// @param taxCollector address
@@ -2096,6 +2097,7 @@ contract GebProxyIncentivesActions is Common {
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         msg.sender.call{value: address(this).balance}("");
     }
+
     /// @notice Withdraws from liquidity mining pool, removes liquidity from Uniswap, repays debt and frees ETH
     /// @param manager address
     /// @param ethJoin address
@@ -2154,6 +2156,7 @@ contract GebProxyIncentivesActions is Common {
         _repayDebt(manager, coinJoin, safe, systemCoin.balanceOf(address(this)));
         msg.sender.call{value: address(this).balance}("");
     }
+
     /// @notice Exits from liquidity mining pool, removes liquidity from Uniswap, repays debt and frees ETH
     /// @param manager address
     /// @param ethJoin address
