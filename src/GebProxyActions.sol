@@ -1936,6 +1936,29 @@ contract GebProxyIncentivesActions is Common {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
+    /// @notice Generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap and stakes LP tokens in Farm
+    /// @param coinJoin address
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param incentives address - Liquidity mining pool
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
+    function provideLiquidityStake(
+        address coinJoin,
+        address uniswapRouter,
+        address incentives,
+        uint wad,
+        uint[2] memory minTokenAmounts
+    ) public payable {
+        DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
+        systemCoin.transferFrom(msg.sender, address(this), wad);
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, address(this), minTokenAmounts);
+
+        _stakeInMine(incentives, wad);
+
+        // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
+        msg.sender.call{value: address(this).balance}("");
+        systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
+    }
+
     /// @notice Generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap
     /// @param manager address
     /// @param taxCollector address

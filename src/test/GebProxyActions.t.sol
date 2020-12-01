@@ -395,6 +395,11 @@ contract ProxyCalls {
         require(success, "");
     }
 
+    function provideLiquidityStake(address, address, address, uint, uint[2] memory) public payable {
+        (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data));
+        require(success, "");
+    }
+
     function openLockETHLeverage(
         address uniswapV2Pair,
         address manager,
@@ -1537,6 +1542,22 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(raiETHPair.balanceOf(address(this)), raiETHPair.totalSupply() - initialPairTotalSupply);
     }
 
+    function testProvideLiquidityStake() public assertProxyEndsWithNoBalance {
+        assertEq(raiETHPair.balanceOf(address(this)), 0);
+        uint initialPairTotalSupply = raiETHPair.totalSupply();
+
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        assertEq(coin.balanceOf(address(this)), 0);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
+        coin.approve(address(proxy), 300 ether);
+        this.provideLiquidityStake{value: 2 ether}(address(coinJoin), address(uniswapRouter), address(incentives), 300 ether, [uint(1),1]);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
+        assertEq(raiETHPair.balanceOf(address(this)), 0);
+        assertEq(raiETHPair.balanceOf(address(incentives)), raiETHPair.totalSupply() - initialPairTotalSupply);
+        assertEq(incentives.balanceOf(address(proxy)), raiETHPair.totalSupply() - initialPairTotalSupply);
+    }
+
     function testGenerateDebtAndProvideLiquidityUniswap() public assertProxyEndsWithNoBalance {
         assertEq(raiETHPair.balanceOf(address(this)), 0);
         uint initialPairTotalSupply = raiETHPair.totalSupply();
@@ -1553,6 +1574,7 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(raiETHPair.balanceOf(address(this)), 0);
         uint initialPairTotalSupply = raiETHPair.totalSupply();
         uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        coin.approve(address(proxy), 300 ether);
         this.lockETHGenerateDebtProvideLiquidityStake{value: 2.5 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), address(uniswapRouter), address(incentives), safe, 300 ether, 0.5 ether, [uint(1),1]);
         assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
         assertEq(raiETHPair.balanceOf(address(incentives)), raiETHPair.totalSupply() - initialPairTotalSupply);
