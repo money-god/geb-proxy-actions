@@ -20,7 +20,7 @@ pragma solidity 0.6.7;
 import "./uni/interfaces/IUniswapV2Router02.sol";
 import "./uni/interfaces/IUniswapV2Pair.sol";
 import "./uni/interfaces/IUniswapV2Factory.sol";
-import "../lib/ds-token/lib/ds-stop/lib/ds-auth/src/auth.sol";
+import "ds-auth/auth.sol";
 
 abstract contract CollateralLike {
     function approve(address, uint) virtual public;
@@ -126,13 +126,14 @@ abstract contract ProxyRegistryLike {
 abstract contract GebIncentivesLike {
     function rewardToken() virtual public returns (address);
     function lpToken() virtual public returns (address);
-    function stake(uint256 amount) virtual public;
-    function withdraw(uint256 amount) virtual public;
+    function stake(uint256) virtual public;
+    function withdraw(uint256) virtual public;
     function exit() virtual public;
-    function balanceOf(address account) virtual public view returns (uint256);
-    function getLockedReward(address account, uint campaignId) virtual external;
-    function getReward(uint campaignId) virtual public;
-
+    function balanceOf(address) virtual public view returns (uint256);
+    function getLockedReward(address, uint) virtual external;
+    function getReward(uint) virtual public;
+    function campaigns(uint) virtual public returns (uint, uint, uint, uint, uint, uint, uint, uint);
+    function userRewardPerTokenPaid(address, uint) virtual public returns (uint);
 }
 
 abstract contract ProxyLike {
@@ -1936,6 +1937,29 @@ contract GebProxyIncentivesActions is Common {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
+    /// @notice Generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap and stakes LP tokens in Farm
+    /// @param coinJoin address
+    /// @param uniswapRouter address - Uniswap V2 Router
+    /// @param incentives address - Liquidity mining pool
+    /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
+    function provideLiquidityStake(
+        address coinJoin,
+        address uniswapRouter,
+        address incentives,
+        uint wad,
+        uint[2] memory minTokenAmounts
+    ) public payable {
+        DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
+        systemCoin.transferFrom(msg.sender, address(this), wad);
+        _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, address(this), minTokenAmounts);
+
+        _stakeInMine(incentives, wad);
+
+        // sending back any leftover tokens/eth, necessary to manage change from providing liquidity
+        msg.sender.call{value: address(this).balance}("");
+        systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
+    }
+
     /// @notice Generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap
     /// @param manager address
     /// @param taxCollector address
@@ -2018,6 +2042,26 @@ contract GebProxyIncentivesActions is Common {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         incentivesContract.getLockedReward(address(this), campaignId);
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
+    }
+
+    /// @notice Harvests rewards available (both instant and staked) 
+    /// @param incentives address - Liquidity mining pool
+    /// @param campaignId uint - Id of the campaign to get rewards from
+    function getRewards(address incentives, uint campaignId) public {
+        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
+
+        (,uint startTime, uint duration,,, uint rewardTokenStored,,) = incentivesContract.campaigns(campaignId);
+
+        if (startTime + duration >= block.timestamp || 
+            rewardTokenStored == 0 || 
+            rewardTokenStored != incentivesContract.userRewardPerTokenPaid(address(this), campaignId)) {
+            incentivesContract.getReward(campaignId);
+        } else {
+            incentivesContract.getLockedReward(address(this), campaignId);
+        }
+
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
     }
 

@@ -277,6 +277,10 @@ contract ProxyCalls {
         proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("harvestReward(address,uint256)", pool, campaign));
     }
 
+    function getRewards(address pool, uint campaign) public {
+        proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("getRewards(address,uint256)", pool, campaign));
+    }
+
     function getLockedReward(address pool, uint campaign) public {
         proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("getLockedReward(address,uint256)", pool, campaign));
     }
@@ -391,6 +395,11 @@ contract ProxyCalls {
     }
 
     function provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad, uint[2] memory) public payable {
+        (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data));
+        require(success, "");
+    }
+
+    function provideLiquidityStake(address, address, address, uint, uint[2] memory) public payable {
         (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data));
         require(success, "");
     }
@@ -1537,6 +1546,22 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(raiETHPair.balanceOf(address(this)), raiETHPair.totalSupply() - initialPairTotalSupply);
     }
 
+    function testProvideLiquidityStake() public assertProxyEndsWithNoBalance {
+        assertEq(raiETHPair.balanceOf(address(this)), 0);
+        uint initialPairTotalSupply = raiETHPair.totalSupply();
+
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        assertEq(coin.balanceOf(address(this)), 0);
+        this.generateDebt(address(manager), address(taxCollector), address(coinJoin), safe, 300 ether);
+        coin.approve(address(proxy), 300 ether);
+        this.provideLiquidityStake{value: 2 ether}(address(coinJoin), address(uniswapRouter), address(incentives), 300 ether, [uint(1),1]);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
+        assertEq(raiETHPair.balanceOf(address(this)), 0);
+        assertEq(raiETHPair.balanceOf(address(incentives)), raiETHPair.totalSupply() - initialPairTotalSupply);
+        assertEq(incentives.balanceOf(address(proxy)), raiETHPair.totalSupply() - initialPairTotalSupply);
+    }
+
     function testGenerateDebtAndProvideLiquidityUniswap() public assertProxyEndsWithNoBalance {
         assertEq(raiETHPair.balanceOf(address(this)), 0);
         uint initialPairTotalSupply = raiETHPair.totalSupply();
@@ -1553,6 +1578,7 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(raiETHPair.balanceOf(address(this)), 0);
         uint initialPairTotalSupply = raiETHPair.totalSupply();
         uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        coin.approve(address(proxy), 300 ether);
         this.lockETHGenerateDebtProvideLiquidityStake{value: 2.5 ether}(address(manager), address(taxCollector), address(ethJoin), address(coinJoin), address(uniswapRouter), address(incentives), safe, 300 ether, 0.5 ether, [uint(1),1]);
         assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
         assertEq(raiETHPair.balanceOf(address(incentives)), raiETHPair.totalSupply() - initialPairTotalSupply);
@@ -1608,6 +1634,26 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.getLockedReward(address(incentives), 1);
 
         assertTrue(incentives.rewardToken().balanceOf(address(this)) > 9.9999 ether);
+    }
+
+    function testGetRewards() public assertProxyEndsWithNoBalance {
+
+        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
+        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
+        assertEq(coin.balanceOf(address(this)), 0);
+        this.generateDebtAndProvideLiquidityStake{value: 2 ether}(address(manager), address(taxCollector), address(coinJoin), address(uniswapRouter), address(incentives), safe, 300 ether, [uint(1),1]);
+        assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
+
+        assertTrue(incentives.balanceOf(address(proxy)) > 0);
+        hevm.warp(now + 12 days); // campaign over
+        this.getRewards(address(incentives), 1);
+        assertEq(incentives.rewardToken().balanceOf(address(proxy)), 0);
+        assertTrue(incentives.rewardToken().balanceOf(address(this)) > 4.9999 ether); // 50% remains locked
+
+        hevm.warp(now + 90 days); // vesting over
+        this.getRewards(address(incentives), 1);
+
+        assertTrue(incentives.rewardToken().balanceOf(address(this)) > 9.9999 ether); // 100%
     }
 
     function testExitMine() public assertProxyEndsWithNoBalance {
