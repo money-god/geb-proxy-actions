@@ -1651,9 +1651,12 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(coin.balanceOf(address(this)), 0);
         this.generateDebtAndProvideLiquidityStake{value: 2 ether}(address(manager), address(taxCollector), address(coinJoin), address(uniswapRouter), address(incentives), safe, 300 ether, [uint(1),1]);
         assertEq(generatedDebt("ETH", manager.safes(safe)), 300 ether);
+        hevm.warp(now + 6 days); // halfway through campaign
+        this.getRewards(address(incentives), 1);
+        assertTrue(incentives.rewardToken().balanceOf(address(this)) > 2.4999 ether); // 50% remains locked, 50% of total instant reward
 
         assertTrue(incentives.balanceOf(address(proxy)) > 0);
-        hevm.warp(now + 12 days); // campaign over
+        hevm.warp(now + 6 days); // campaign over
         this.getRewards(address(incentives), 1);
         assertEq(incentives.rewardToken().balanceOf(address(proxy)), 0);
         assertTrue(incentives.rewardToken().balanceOf(address(this)) > 4.9999 ether); // 50% remains locked
