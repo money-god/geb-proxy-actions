@@ -1495,7 +1495,7 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         uniswapRouter.addLiquidity(address(weth), address(coin), initETHRAIPairLiquidity, 100 ether, 1 ether, initRAIETHPairLiquidity, address(this), now);
 
         // zeroing balances
-        coin.transfer(address(0), coin.balanceOf(address(this)));
+        coin.transfer(address(1), coin.balanceOf(address(this)));
         raiETHPair.transfer(address(0), raiETHPair.balanceOf(address(this)));
 
         // Setup Incentives
@@ -1894,7 +1894,7 @@ contract GebProxyLeverageActionsTest is GebDeployTestBase, ProxyCalls {
         uniswapRouter.addLiquidity(address(weth), address(coin), initETHRAIPairLiquidity, 100 ether, 1 ether, initRAIETHPairLiquidity, address(this), now);
 
         // zeroing balances
-        coin.transfer(address(0), coin.balanceOf(address(this)));
+        coin.transfer(address(1), coin.balanceOf(address(this)));
         raiETHPair.transfer(address(0), raiETHPair.balanceOf(address(this)));
 
         // Setup Incentives
