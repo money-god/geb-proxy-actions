@@ -124,6 +124,7 @@ abstract contract ProxyRegistryLike {
 }
 
 abstract contract GebIncentivesLike {
+    function earned(address, uint256) virtual public view returns (uint256);
     function rewardToken() virtual public returns (address);
     function lpToken() virtual public returns (address);
     function stake(uint256) virtual public;
@@ -1824,7 +1825,7 @@ contract GebProxyIncentivesActions is Common {
 
         if (startTime + duration >= block.timestamp || 
             rewardTokenStored == 0 || 
-            rewardTokenStored != incentivesContract.userRewardPerTokenPaid(address(this), campaignId)) {
+            incentivesContract.earned(address(this), campaignId) > 0) {
             incentivesContract.getReward(campaignId);
         } else {
             incentivesContract.getLockedReward(address(this), campaignId);
