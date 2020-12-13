@@ -135,6 +135,8 @@ abstract contract GebIncentivesLike {
     function getReward(uint) virtual public;
     function campaigns(uint) virtual public returns (uint, uint, uint, uint, uint, uint, uint, uint);
     function userRewardPerTokenPaid(address, uint) virtual public returns (uint);
+    function delayedRewards(address,uint) virtual public view returns (uint, uint, uint);
+
 }
 
 abstract contract ProxyLike {
@@ -1828,7 +1830,9 @@ contract GebProxyIncentivesActions is Common {
             incentivesContract.earned(address(this), campaignId) > 0) {
             incentivesContract.getReward(campaignId);
         } else {
-            incentivesContract.getLockedReward(address(this), campaignId);
+            (uint totalAmount, uint exitedAmount,) = incentivesContract.delayedRewards(address(this), campaignId);
+            if (totalAmount > exitedAmount)
+                incentivesContract.getLockedReward(address(this), campaignId);
         }
 
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
@@ -1864,7 +1868,7 @@ contract GebProxyIncentivesActions is Common {
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         incentivesContract.withdraw(value);
-        incentivesContract.getReward(campaignId);
+        getRewards(incentives, campaignId);
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
@@ -1881,7 +1885,7 @@ contract GebProxyIncentivesActions is Common {
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         incentivesContract.withdraw(value);
-        incentivesContract.getReward(campaignId);
+        getRewards(incentives, campaignId);
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         return _removeLiquidityUniswap(uniswapRouter, systemCoin, lpToken.balanceOf(address(this)), msg.sender, minTokenAmounts);
     }
