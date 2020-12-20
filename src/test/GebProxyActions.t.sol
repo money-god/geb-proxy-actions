@@ -1451,7 +1451,6 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     }
 }
 
-
 contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
     GebSafeManager manager;
 
@@ -1500,6 +1499,8 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
         // Setup Incentives
         incentives = new RollingDistributionIncentives(address(raiETHPair), address(col));
+        incentives.modifyParameters("canStake", 1);
+
         col.mint(address(incentives), 20 ether);
         incentives.newCampaign(10 ether, now + 1, 12 days, 90 days, 500);
         hevm.warp(now + 1);
