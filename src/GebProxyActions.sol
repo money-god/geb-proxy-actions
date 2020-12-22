@@ -243,6 +243,7 @@ contract GebProxyActions is Common {
     ) internal returns (int deltaDebt) {
         // Updates stability fee rate
         uint rate = TaxCollectorLike(taxCollector).taxSingle(collateralType);
+        require(rate > 0, "invalid-collateral-type");
 
         // Gets COIN balance of the handler in the safeEngine
         uint coin = SAFEEngineLike(safeEngine).coinBalance(safeHandler);
@@ -264,6 +265,8 @@ contract GebProxyActions is Common {
     ) internal view returns (int deltaDebt) {
         // Gets actual rate from the safeEngine
         (, uint rate,,,) = SAFEEngineLike(safeEngine).collateralTypes(collateralType);
+        require(rate > 0, "invalid-collateral-type");
+
         // Gets actual generatedDebt value of the safe
         (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safe);
 
@@ -1200,6 +1203,7 @@ contract GebProxyIncentivesActions is Common {
     ) internal returns (int deltaDebt) {
         // Updates stability fee rate
         uint rate = TaxCollectorLike(taxCollector).taxSingle(collateralType);
+        require(rate > 0, "invalid-collateral-type");
 
         // Gets COIN balance of the handler in the safeEngine
         uint coin = SAFEEngineLike(safeEngine).coinBalance(safeHandler);
@@ -1227,6 +1231,8 @@ contract GebProxyIncentivesActions is Common {
     ) internal view returns (int deltaDebt) {
         // Gets actual rate from the safeEngine
         (, uint rate,,,) = SAFEEngineLike(safeEngine).collateralTypes(collateralType);
+        require(rate > 0, "invalid-collateral-type");
+        
         // Gets actual generatedDebt value of the safe
         (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safe);
 
@@ -2071,6 +2077,7 @@ contract GebProxyLeverageActions is Common {
     ) internal returns (int deltaDebt) {
         // Updates stability fee rate
         uint rate = TaxCollectorLike(taxCollector).taxSingle(collateralType);
+        require(rate > 0, "invalid-collateral-type");
 
         // Gets COIN balance of the handler in the safeEngine
         uint coin = SAFEEngineLike(safeEngine).coinBalance(safeHandler);
@@ -2098,6 +2105,8 @@ contract GebProxyLeverageActions is Common {
     ) internal view returns (int deltaDebt) {
         // Gets actual rate from the safeEngine
         (, uint rate,,,) = SAFEEngineLike(safeEngine).collateralTypes(collateralType);
+        require(rate > 0, "invalid-collateral-type");
+
         // Gets actual generatedDebt value of the safe
         (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safe);
 
