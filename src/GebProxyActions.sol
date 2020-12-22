@@ -222,7 +222,7 @@ contract GebProxyActions is Common {
     }
 
     function convertTo18(address collateralJoin, uint256 amt) internal returns (uint256 wad) {
-        // For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
+        // For those collaterals that have other than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
         // Adapters will automatically handle the difference of precision
         uint decimals = CollateralJoinLike(collateralJoin).decimals();
         wad = amt;
@@ -231,6 +231,8 @@ contract GebProxyActions is Common {
               amt,
               10 ** (18 - decimals)
           );
+        } else if (decimals > 18) {
+          wad = amt / 10 ** (decimals - 18);
         }
     }
 
@@ -1175,9 +1177,9 @@ contract GebProxyIncentivesActions is Common {
         rad = multiply(wad, 10 ** 27);
     }
 
-    /// @notice For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
-    /// @dev Adapters will automatically handle the difference of precision
     function convertTo18(address collateralJoin, uint256 amt) internal returns (uint256 wad) {
+        // For those collaterals that have other than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
+        // Adapters will automatically handle the difference of precision
         uint decimals = CollateralJoinLike(collateralJoin).decimals();
         wad = amt;
         if (decimals < 18) {
@@ -1185,6 +1187,8 @@ contract GebProxyIncentivesActions is Common {
               amt,
               10 ** (18 - decimals)
           );
+        } else if (decimals > 18) {
+          wad = amt / 10 ** (decimals - 18);
         }
     }
 
@@ -1232,7 +1236,7 @@ contract GebProxyIncentivesActions is Common {
         // Gets actual rate from the safeEngine
         (, uint rate,,,) = SAFEEngineLike(safeEngine).collateralTypes(collateralType);
         require(rate > 0, "invalid-collateral-type");
-        
+
         // Gets actual generatedDebt value of the safe
         (, uint generatedDebt) = SAFEEngineLike(safeEngine).safes(collateralType, safe);
 
@@ -2049,9 +2053,9 @@ contract GebProxyLeverageActions is Common {
         rad = multiply(wad, 10 ** 27);
     }
 
-    /// @notice For those collaterals that have less than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
-    /// @dev Adapters will automatically handle the difference of precision
     function convertTo18(address collateralJoin, uint256 amt) internal returns (uint256 wad) {
+        // For those collaterals that have other than 18 decimals precision we need to do the conversion before passing to modifySAFECollateralization function
+        // Adapters will automatically handle the difference of precision
         uint decimals = CollateralJoinLike(collateralJoin).decimals();
         wad = amt;
         if (decimals < 18) {
@@ -2059,6 +2063,8 @@ contract GebProxyLeverageActions is Common {
               amt,
               10 ** (18 - decimals)
           );
+        } else if (decimals > 18) {
+          wad = amt / 10 ** (decimals - 18);
         }
     }
 
