@@ -2798,7 +2798,7 @@ contract GebProxyLeverageActions is Common {
         // flashswap
         _startSwap(
           address(0),
-          ((collateralBalance * leverage) / 1000) - collateralBalance,
+          subtract((multiply(collateralBalance, leverage) / 1000), collateralBalance),
           address(CoinJoinLike(coinJoin).systemCoin()),
           abi.encode(
               manager,
