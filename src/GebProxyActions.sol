@@ -299,7 +299,7 @@ contract GebProxyActions is Common {
     }
 
     // Public functions
-    function transfer(address collateral, address dst, uint amt) public {
+    function transfer(address collateral, address dst, uint amt) external {
         CollateralLike(collateral).transfer(dst, amt);
     }
 
@@ -327,14 +327,14 @@ contract GebProxyActions is Common {
     function approveSAFEModification(
         address obj,
         address usr
-    ) public {
+    ) external {
         ApproveSAFEModificationLike(obj).approveSAFEModification(usr);
     }
 
     function denySAFEModification(
         address obj,
         address usr
-    ) public {
+    ) external {
         ApproveSAFEModificationLike(obj).denySAFEModification(usr);
     }
 
@@ -359,7 +359,7 @@ contract GebProxyActions is Common {
         address manager,
         uint safe,
         address dst
-    ) public {
+    ) external {
         // Gets actual proxy address
         address proxy = ProxyRegistryLike(proxyRegistry).proxies(dst);
         // Checks if the proxy address already existed and dst address is still the owner
@@ -382,7 +382,7 @@ contract GebProxyActions is Common {
         uint safe,
         address usr,
         uint ok
-    ) public {
+    ) external {
         ManagerLike(manager).allowSAFE(safe, usr, ok);
     }
 
@@ -390,7 +390,7 @@ contract GebProxyActions is Common {
         address manager,
         address usr,
         uint ok
-    ) public {
+    ) external {
         ManagerLike(manager).allowHandler(usr, ok);
     }
 
@@ -425,7 +425,7 @@ contract GebProxyActions is Common {
         address manager,
         uint safe,
         address dst
-    ) public {
+    ) external {
         ManagerLike(manager).quitSystem(safe, dst);
     }
 
@@ -433,7 +433,7 @@ contract GebProxyActions is Common {
         address manager,
         address src,
         uint safe
-    ) public {
+    ) external {
         ManagerLike(manager).enterSystem(src, safe);
     }
 
@@ -441,7 +441,7 @@ contract GebProxyActions is Common {
         address manager,
         uint safeSrc,
         uint safeDst
-    ) public {
+    ) external {
         ManagerLike(manager).moveSAFE(safeSrc, safeDst);
     }
 
@@ -525,7 +525,7 @@ contract GebProxyActions is Common {
         address ethJoin,
         uint safe,
         uint wad
-    ) public {
+    ) external {
         // Unlocks WETH amount from the SAFE
         modifySAFECollateralization(manager, safe, -toInt(wad), 0);
         // Moves the amount from the SAFE handler to proxy's address
@@ -558,7 +558,7 @@ contract GebProxyActions is Common {
         address ethJoin,
         uint safe,
         uint wad
-    ) public {
+    ) external {
         // Moves the amount from the SAFE handler to proxy's address
         transferCollateral(manager, safe, address(this), wad);
         // Exits WETH amount to proxy address as a token
@@ -612,7 +612,7 @@ contract GebProxyActions is Common {
         uint wad,
         address liquidationEngine,
         address saviour
-    ) public {
+    ) external {
         generateDebt(manager, taxCollector, coinJoin, safe, wad);
         protectSAFE(manager, safe, liquidationEngine, saviour);
     }
@@ -732,7 +732,7 @@ contract GebProxyActions is Common {
         address coinJoin,
         bytes32 collateralType,
         uint deltaWad
-    ) public payable returns (uint safe) {
+    ) external payable returns (uint safe) {
         safe = openSAFE(manager, collateralType, address(this));
         lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, safe, deltaWad);
     }
@@ -884,7 +884,7 @@ contract GebProxyActions is Common {
         uint safe,
         uint collateralWad,
         uint deltaWad
-    ) public {
+    ) external {
         address safeHandler = ManagerLike(manager).safes(safe);
         // Joins COIN amount into the safeEngine
         coinJoin_join(coinJoin, safeHandler, deltaWad);
@@ -943,7 +943,7 @@ contract GebProxyActions is Common {
         uint safe,
         uint collateralAmount,
         uint deltaWad
-    ) public {
+    ) external {
         address safeHandler = ManagerLike(manager).safes(safe);
         // Joins COIN amount into the safeEngine
         coinJoin_join(coinJoin, safeHandler, deltaWad);
@@ -1024,7 +1024,7 @@ contract GebProxyActionsGlobalSettlement is Common {
         address ethJoin,
         address globalSettlement,
         uint safe
-    ) public {
+    ) external {
         uint wad = _freeCollateral(manager, globalSettlement, safe);
         // Exits WETH amount to proxy address as a token
         CollateralJoinLike(ethJoin).exit(address(this), wad);
@@ -1444,14 +1444,14 @@ contract GebProxyIncentivesActions is Common {
     /// @param collateral address - address of ERC20 collateral
     /// @param dst address - Transfer destination
     /// @param amt address - Amount to transfer
-    function transfer(address collateral, address dst, uint amt) public {
+    function transfer(address collateral, address dst, uint amt) external {
         CollateralLike(collateral).transfer(dst, amt);
     }
 
     /// @notice Joins the system with the full msg.value
     /// @param apt address - Address of the adapter
     /// @param safe uint - Safe Id
-    function ethJoin_join(address apt, address safe) public payable {
+    function ethJoin_join(address apt, address safe) external payable {
         ethJoin_join(apt, safe, msg.value);
     }
 
@@ -1530,7 +1530,7 @@ contract GebProxyIncentivesActions is Common {
         address manager,
         address ethJoin,
         uint safe
-    ) public payable {
+    ) external payable {
         _lockETH(manager, ethJoin, safe, msg.value);
     }
 
@@ -1544,7 +1544,7 @@ contract GebProxyIncentivesActions is Common {
         address ethJoin,
         uint safe,
         uint wad
-    ) public {
+    ) external {
         // Unlocks WETH amount from the SAFE
         modifySAFECollateralization(manager, safe, -toInt(wad), 0);
         // Moves the amount from the SAFE handler to proxy's address
@@ -1576,8 +1576,8 @@ contract GebProxyIncentivesActions is Common {
         bytes32 collateralType,
         uint deltaWad,
         uint liquidityWad,
-        uint[2] memory minTokenAmounts
-    ) public payable returns (uint safe) {
+        uint[2] calldata minTokenAmounts
+    ) external payable returns (uint safe) {
         safe = openSAFE(manager, collateralType, address(this));
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
 
@@ -1611,8 +1611,8 @@ contract GebProxyIncentivesActions is Common {
         uint safe,
         uint deltaWad,
         uint liquidityWad,
-        uint[2] memory minTokenAmounts
-    ) public payable {
+        uint[2] calldata minTokenAmounts
+    ) external payable {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
 
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
@@ -1647,8 +1647,8 @@ contract GebProxyIncentivesActions is Common {
         bytes32 collateralType,
         uint256 deltaWad,
         uint256 liquidityWad,
-        uint256[2] memory minTokenAmounts
-    ) public payable returns (uint safe) {
+        uint256[2] calldata minTokenAmounts
+    ) external payable returns (uint safe) {
         safe = openSAFE(manager, collateralType, address(this));
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
 
@@ -1708,7 +1708,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param wad uint - Amount of coin to provide (msg.value for ETH)
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
-    function provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad, uint[2] memory minTokenAmounts) public payable {
+    function provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad, uint[2] calldata minTokenAmounts) external payable {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         systemCoin.transferFrom(msg.sender, address(this), wad);
         _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, msg.sender, minTokenAmounts);
@@ -1756,8 +1756,8 @@ contract GebProxyIncentivesActions is Common {
         address uniswapRouter,
         uint safe,
         uint wad,
-        uint[2] memory minTokenAmounts
-    ) public payable {
+        uint[2] calldata minTokenAmounts
+    ) external payable {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         _generateDebt(manager, taxCollector, coinJoin, safe, wad, address(this));
 
@@ -1771,7 +1771,7 @@ contract GebProxyIncentivesActions is Common {
     /// @notice Stakes in liquidity mining pool
     /// @param incentives address - pool address
     /// @param wad uint - amount
-    function stakeInMine(address incentives, uint wad) public {
+    function stakeInMine(address incentives, uint wad) external {
         DSTokenLike(GebIncentivesLike(incentives).lpToken()).transferFrom(msg.sender, address(this), wad);
         _stakeInMine(incentives, wad);
     }
@@ -1792,8 +1792,8 @@ contract GebProxyIncentivesActions is Common {
         address incentives,
         uint safe,
         uint wad,
-        uint[2] memory minTokenAmounts
-    ) public payable {
+        uint[2] calldata minTokenAmounts
+    ) external payable {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         _generateDebt(manager, taxCollector, coinJoin, safe, wad, address(this));
 
@@ -1809,7 +1809,7 @@ contract GebProxyIncentivesActions is Common {
     /// @notice Harvests rewards from liquidity mining pool
     /// @param incentives address - Liquidity mining pool
     /// @param campaignId uint - Id of the campaign to get rewards from
-    function harvestReward(address incentives, uint campaignId) public {
+    function harvestReward(address incentives, uint campaignId) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         incentivesContract.getReward(campaignId);
@@ -1819,7 +1819,7 @@ contract GebProxyIncentivesActions is Common {
     /// @notice Gets vested rewards from liquidity mining campaign
     /// @param incentives address - Liquidity mining pool
     /// @param campaignId uint - Id of the campaign to get rewards from
-    function getLockedReward(address incentives, uint campaignId) public {
+    function getLockedReward(address incentives, uint campaignId) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         incentivesContract.getLockedReward(address(this), campaignId);
@@ -1850,7 +1850,7 @@ contract GebProxyIncentivesActions is Common {
 
     /// @notice Exits liquidity mining pool (withdraw LP tokens and getRewards for current campaign)
     /// @param incentives address - Liquidity mining pool
-    function exitMine(address incentives) public {
+    function exitMine(address incentives) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
@@ -1862,7 +1862,7 @@ contract GebProxyIncentivesActions is Common {
     /// @notice Withdraw LP tokens from liquidity mining pool
     /// @param incentives address - Liquidity mining pool
     /// @param value uint - value to withdraw
-    function withdrawFromMine(address incentives, uint value) public {
+    function withdrawFromMine(address incentives, uint value) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         incentivesContract.withdraw(value);
@@ -1873,7 +1873,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param incentives address - Liquidity mining pool
     /// @param value uint - value to withdraw
     /// @param campaignId uint - Id of the campaign to get rewards from
-    function withdrawAndHarvest(address incentives, uint value, uint campaignId) public {
+    function withdrawAndHarvest(address incentives, uint value, uint campaignId) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
@@ -1905,7 +1905,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param systemCoin address
     /// @param value uint - Amount of LP tokens to remove
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
-    function removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value, uint[2] memory minTokenAmounts) public returns (uint amountA, uint amountB) {
+    function removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value, uint[2] calldata minTokenAmounts) external returns (uint amountA, uint amountB) {
         DSTokenLike(getWethPair(uniswapRouter, systemCoin)).transferFrom(msg.sender, address(this), value);
         return _removeLiquidityUniswap(uniswapRouter, systemCoin, value, msg.sender, minTokenAmounts);
     }
@@ -1915,7 +1915,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param incentives address - Liquidity mining pool
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
-    function withdrawAndRemoveLiquidity(address coinJoin, address incentives, uint value, address uniswapRouter, uint[2] memory minTokenAmounts) public returns (uint amountA, uint amountB) {
+    function withdrawAndRemoveLiquidity(address coinJoin, address incentives, uint value, address uniswapRouter, uint[2] calldata minTokenAmounts) external returns (uint amountA, uint amountB) {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
         incentivesContract.withdraw(value);
@@ -1929,7 +1929,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param incentives address - Liquidity mining pool
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
-    function withdrawRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, uint value, address uniswapRouter, uint[2] memory minTokenAmounts) public {
+    function withdrawRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, uint value, address uniswapRouter, uint[2] calldata minTokenAmounts) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
@@ -1952,7 +1952,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param ethToFree uint - Amount of eth to be freed
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
-    function withdrawRemoveLiquidityRepayDebtFreeETH(address manager, address ethJoin, address coinJoin, uint safe, address incentives, uint valueToWithdraw, uint ethToFree, address uniswapRouter, uint[2] memory minTokenAmounts) public {
+    function withdrawRemoveLiquidityRepayDebtFreeETH(address manager, address ethJoin, address coinJoin, uint safe, address incentives, uint valueToWithdraw, uint ethToFree, address uniswapRouter, uint[2] calldata minTokenAmounts) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
@@ -1970,7 +1970,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param incentives address - Liquidity mining pool
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
-    function exitAndRemoveLiquidity(address coinJoin, address incentives, address uniswapRouter, uint[2] memory minTokenAmounts) public returns (uint amountA, uint amountB) {
+    function exitAndRemoveLiquidity(address coinJoin, address incentives, address uniswapRouter, uint[2] calldata minTokenAmounts) external returns (uint amountA, uint amountB) {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
@@ -1986,7 +1986,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param incentives address - Liquidity mining pool
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
-    function exitRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, address uniswapRouter, uint[2] memory minTokenAmounts) public {
+    function exitRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, address uniswapRouter, uint[2] calldata minTokenAmounts) external {
 
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
@@ -2010,7 +2010,7 @@ contract GebProxyIncentivesActions is Common {
     /// @param ethToFree uint - Amount of eth to be freed
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
-    function exitRemoveLiquidityRepayDebtFreeETH(address manager, address ethJoin, address coinJoin, uint safe, address incentives, uint ethToFree, address uniswapRouter, uint[2] memory minTokenAmounts) public {
+    function exitRemoveLiquidityRepayDebtFreeETH(address manager, address ethJoin, address coinJoin, uint safe, address incentives, uint ethToFree, address uniswapRouter, uint[2] calldata minTokenAmounts) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
         DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
@@ -2365,14 +2365,14 @@ contract GebProxyLeverageActions is Common {
     /// @param collateral address - address of ERC20 collateral
     /// @param dst address - Transfer destination
     /// @param amt address - Amount to transfer
-    function transfer(address collateral, address dst, uint amt) public {
+    function transfer(address collateral, address dst, uint amt) external {
         CollateralLike(collateral).transfer(dst, amt);
     }
 
     /// @notice Joins the system with the full msg.value
     /// @param apt address - Address of the adapter
     /// @param safe uint - Safe Id
-    function ethJoin_join(address apt, address safe) public payable {
+    function ethJoin_join(address apt, address safe) external payable {
         ethJoin_join(apt, safe, msg.value);
     }
 
@@ -2395,7 +2395,7 @@ contract GebProxyLeverageActions is Common {
     function approveSAFEModification(
         address safeEngine,
         address usr
-    ) public {
+    ) external {
         ApproveSAFEModificationLike(safeEngine).approveSAFEModification(usr);
     }
 
@@ -2405,7 +2405,7 @@ contract GebProxyLeverageActions is Common {
     function denySAFEModification(
         address safeEngine,
         address usr
-    ) public {
+    ) external {
         ApproveSAFEModificationLike(safeEngine).denySAFEModification(usr);
     }
 
@@ -2443,7 +2443,7 @@ contract GebProxyLeverageActions is Common {
         address manager,
         uint safe,
         address dst
-    ) public {
+    ) external {
         // Gets actual proxy address
         address proxy = ProxyRegistryLike(proxyRegistry).proxies(dst);
         // Checks if the proxy address already existed and dst address is still the owner
@@ -2471,7 +2471,7 @@ contract GebProxyLeverageActions is Common {
         uint safe,
         address usr,
         uint ok
-    ) public {
+    ) external {
         ManagerLike(manager).allowSAFE(safe, usr, ok);
     }
 
@@ -2483,7 +2483,7 @@ contract GebProxyLeverageActions is Common {
         address manager,
         address usr,
         uint ok
-    ) public {
+    ) external {
         ManagerLike(manager).allowHandler(usr, ok);
     }
 
@@ -2538,7 +2538,7 @@ contract GebProxyLeverageActions is Common {
         address manager,
         uint safe,
         address dst
-    ) public {
+    ) external {
         ManagerLike(manager).quitSystem(safe, dst);
     }
 
@@ -2550,7 +2550,7 @@ contract GebProxyLeverageActions is Common {
         address manager,
         address src,
         uint safe
-    ) public {
+    ) external {
         ManagerLike(manager).enterSystem(src, safe);
     }
 
@@ -2562,7 +2562,7 @@ contract GebProxyLeverageActions is Common {
         address manager,
         uint safeSrc,
         uint safeDst
-    ) public {
+    ) external {
         ManagerLike(manager).moveSAFE(safeSrc, safeDst);
     }
 
@@ -2574,7 +2574,7 @@ contract GebProxyLeverageActions is Common {
         address manager,
         address ethJoin,
         uint safe
-    ) public payable {
+    ) external payable {
         _lockETH(manager, ethJoin, safe, msg.value);
     }
 
@@ -2612,7 +2612,7 @@ contract GebProxyLeverageActions is Common {
         address ethJoin,
         uint safe,
         uint wad
-    ) public {
+    ) external {
         // Moves the amount from the SAFE handler to proxy's address
         transferCollateral(manager, safe, address(this), wad);
         // Exits WETH amount to proxy address as a token
@@ -2635,7 +2635,7 @@ contract GebProxyLeverageActions is Common {
         address coinJoin,
         uint safe,
         uint wad
-    ) public {
+    ) external {
         _generateDebt(manager, taxCollector, coinJoin, safe, wad, msg.sender);
     }
 
@@ -2649,7 +2649,7 @@ contract GebProxyLeverageActions is Common {
         address coinJoin,
         uint safe,
         uint wad
-    ) public {
+    ) external {
         _repayDebt(manager, coinJoin, safe, wad);
     }
 
@@ -2685,7 +2685,7 @@ contract GebProxyLeverageActions is Common {
         address coinJoin,
         bytes32 collateralType,
         uint deltaWad
-    ) public payable returns (uint safe) {
+    ) external payable returns (uint safe) {
         safe = openSAFE(manager, collateralType, address(this));
         lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, safe, deltaWad);
     }
@@ -2704,7 +2704,7 @@ contract GebProxyLeverageActions is Common {
         uint safe,
         uint collateralWad,
         uint deltaWad
-    ) public {
+    ) external {
         _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, collateralWad, deltaWad);
         // Sends ETH back to the user's wallet
         msg.sender.transfer(collateralWad);
