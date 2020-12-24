@@ -285,20 +285,20 @@ contract ProxyCalls {
         proxy.execute(gebProxyIncentivesActions, abi.encodeWithSignature("getLockedReward(address,uint256)", pool, campaign));
     }
 
-    function exitMine(address pool) public {
+    function exitMine(address) public {
         proxy.execute(gebProxyIncentivesActions, msg.data);
     }
 
-    function withdrawFromMine(address pool, uint value) public {
+    function withdrawFromMine(address, uint) public {
         proxy.execute(gebProxyIncentivesActions, msg.data);
     }
 
-    function withdrawAndHarvest(address pool, uint value, uint campaignId) public {
+    function withdrawAndHarvest(address, uint, uint) public {
         proxy.execute(gebProxyIncentivesActions, msg.data);
     }
 
 
-    function removeLiquidityUniswap(address uniswapRouter, address systemCoin, uint value, uint[2] memory) public returns (uint amountA, uint amountB) {
+    function removeLiquidityUniswap(address, address, uint, uint[2] memory) public returns (uint amountA, uint amountB) {
         bytes memory response = proxy.execute(gebProxyIncentivesActions, msg.data);
         assembly {
             amountA := mload(add(response, 0x20))
@@ -306,7 +306,7 @@ contract ProxyCalls {
         }
     }
 
-    function withdrawHarvestRemoveLiquidity(address incentives, address uniswapRouter, address systemCoin, uint value, uint campaignId, uint[2] memory) public returns (uint amountA, uint amountB) {
+    function withdrawHarvestRemoveLiquidity(address, address, address, uint, uint, uint[2] memory) public returns (uint amountA, uint amountB) {
         bytes memory response = proxy.execute(gebProxyIncentivesActions, msg.data);
         assembly {
             amountA := mload(add(response, 0x20))
@@ -314,11 +314,11 @@ contract ProxyCalls {
         }
     }
 
-    function stakeInMine(address incentives, uint wad) public {
+    function stakeInMine(address, uint) public {
         proxy.execute(gebProxyIncentivesActions, msg.data);
     }
 
-    function withdrawAndRemoveLiquidity(address join, address pool, uint value, address uniswapRouter, uint[2] memory) public returns (uint amountA, uint amountB) {
+    function withdrawAndRemoveLiquidity(address, address, uint, address, uint[2] memory) public returns (uint amountA, uint amountB) {
         bytes memory response = proxy.execute(gebProxyIncentivesActions, msg.data);
         assembly {
             amountA := mload(add(response, 0x20))
@@ -326,7 +326,7 @@ contract ProxyCalls {
         }
     }
 
-    function exitAndRemoveLiquidity(address join, address pool, address uniswapRouter, uint[2] memory) public returns (uint amountA, uint amountB) {
+    function exitAndRemoveLiquidity(address, address, address, uint[2] memory) public returns (uint amountA, uint amountB) {
         bytes memory response = proxy.execute(gebProxyIncentivesActions, msg.data);
         assembly {
             amountA := mload(add(response, 0x20))
@@ -334,19 +334,19 @@ contract ProxyCalls {
         }
     }
 
-    function exitRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address pool, address uniswapRouter, uint[2] memory) public {
+    function exitRemoveLiquidityRepayDebt(address, address, uint, address, address, uint[2] memory) public {
         proxy.execute(gebProxyIncentivesActions, msg.data);
     }
 
-    function exitRemoveLiquidityRepayDebtFreeETH(address manager, address ethJoin, address coinJoin, uint safe, address incentives, uint ethToFree, address uniswapRouter, uint[2] memory) public {
+    function exitRemoveLiquidityRepayDebtFreeETH(address, address, address, uint, address, uint, address, uint[2] memory) public {
         proxy.execute(gebProxyIncentivesActions, msg.data);
     }
 
-    function withdrawRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address pool, uint value, address uniswapRouter, uint[2] memory) public {
+    function withdrawRemoveLiquidityRepayDebt(address, address, uint, address, uint, address, uint[2] memory) public {
         proxy.execute(gebProxyIncentivesActions, msg.data);
     }
 
-    function withdrawRemoveLiquidityRepayDebtFreeETH(address manager, address ethJoin, address coinJoin, uint safe, address incentives, uint valueToWithdraw, uint ethToFree, address uniswapRouter, uint[2] memory) public {
+    function withdrawRemoveLiquidityRepayDebtFreeETH(address, address, address, uint, address, uint, uint, address, uint[2] memory) public {
         proxy.execute(gebProxyIncentivesActions, msg.data);
     }
 
@@ -402,7 +402,7 @@ contract ProxyCalls {
         require(success, "");
     }
 
-    function provideLiquidityUniswap(address coinJoin, address uniswapRouter, uint wad, uint[2] memory) public payable {
+    function provideLiquidityUniswap(address, address, uint, uint[2] memory) public payable {
         (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyIncentivesActions, msg.data));
         require(success, "");
     }
@@ -412,17 +412,7 @@ contract ProxyCalls {
         require(success, "");
     }
 
-    function openLockETHLeverage(
-        address uniswapV2Pair,
-        address manager,
-        address ethJoin,
-        address taxCollector,
-        address coinJoin,
-        address weth,
-        address callbackProxy,
-        bytes32 collateralType,
-        uint leverage // 3 decimal places, 2.5 == 2500
-    ) public payable returns (uint safe) {
+    function openLockETHLeverage(address, address, address, address, address, address, address, bytes32, uint) public payable returns (uint safe) {
         address payable target = address(proxy);
         bytes memory data = abi.encodeWithSignature("execute(address,bytes)", gebProxyLeverageActions, msg.data);
         assembly {
@@ -443,65 +433,22 @@ contract ProxyCalls {
         }
     }
 
-    function lockETHLeverage(
-        address uniswapV2Pair,
-        address manager,
-        address ethJoin,
-        address taxCollector,
-        address coinJoin,
-        address weth,
-        address callbackProxy,
-        bytes32 collateralType,
-        uint safe,
-        uint leverage // 3 decimal places, 2.5 == 2500
-    ) public payable {
+    function lockETHLeverage(address, address, address, address, address, address, address, bytes32, uint, uint) public payable {
         (bool success,) = address(proxy).call{value: msg.value}(abi.encodeWithSignature("execute(address,bytes)", gebProxyLeverageActions, msg.data));
         require(success, "");
     }
 
-    function flashLeverage(
-        address uniswapV2Pair,
-        address manager,
-        address ethJoin,
-        address taxCollector,
-        address coinJoin,
-        address weth,
-        address callbackProxy,
-        bytes32 collateralType,
-        uint safe,
-        uint leverage // 3 decimal places, 2.5 == 2500
-    ) public {
+    function flashLeverage(address, address, address, address, address, address, address, bytes32, uint, uint) public {
         (bool success,) = address(proxy).call(abi.encodeWithSignature("execute(address,bytes)", gebProxyLeverageActions, msg.data));
         require(success, "");
     }
 
-    function flashDeleverage(
-        address uniswapV2Pair,
-        address manager,
-        address ethJoin,
-        address taxCollector,
-        address coinJoin,
-        address weth,
-        address callbackProxy,
-        bytes32 collateralType,
-        uint safe
-    ) public {
+    function flashDeleverage(address, address, address, address, address, address, address, bytes32, uint) public {
         (bool success,) = address(proxy).call(abi.encodeWithSignature("execute(address,bytes)", gebProxyLeverageActions, msg.data));
         require(success, "");
     }
 
-    function flashDeleverageFreeETH(
-        address uniswapV2Pair,
-        address manager,
-        address ethJoin,
-        address taxCollector,
-        address coinJoin,
-        address weth,
-        address callbackProxy,
-        bytes32 collateralType,
-        uint safe,
-        uint amountToFree
-    ) public {
+    function flashDeleverageFreeETH(address, address, address, address, address, address, address, bytes32, uint, uint) public {
         (bool success,) = address(proxy).call(abi.encodeWithSignature("execute(address,bytes)", gebProxyLeverageActions, msg.data));
         require(success, "");
     }
@@ -1783,23 +1730,6 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertEq(generatedDebt("ETH", manager.safes(safe)), 260000000000000000002);
     }
 
-    function testWithdrawRemoveLiquidityRepayDebtFreeETH() public assertProxyEndsWithNoBalance {
-        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
-        assertEq(coin.balanceOf(address(this)), 0);
-        this.generateDebtAndProvideLiquidityStake{value: 2 ether}(address(manager), address(taxCollector), address(coinJoin), address(uniswapRouter), address(incentives), safe, 300 ether, [uint(1),1]);
-        hevm.warp(12 days);
-        uint lpTokenBalanceBeforeWithdraw = raiETHPair.balanceOf(address(this));
-        uint ethBalanceBeforeWithdraw = address(this).balance;
-        uint coinBalanceBeforeWithdraw = coin.balanceOf(address(this));
-        this.withdrawRemoveLiquidityRepayDebtFreeETH(address(manager), address(ethJoin), address(coinJoin), safe, address(incentives), raiETHPair.balanceOf(address(incentives)), 0.2 ether, address(uniswapRouter), [uint(1),1]);
-        assertEq(raiETHPair.balanceOf(address(this)), lpTokenBalanceBeforeWithdraw);
-        assertEq(coinBalanceBeforeWithdraw, coin.balanceOf(address(this)));
-        assertTrue(ethBalanceBeforeWithdraw < address(this).balance);
-        assertEq(generatedDebt("ETH", manager.safes(safe)), 260000000000000000002);
-        assertEq(lockedCollateral("ETH", manager.safes(safe)), 1.8 ether);
-    }
-
     function testExitAndRemoveLiquidity() public assertProxyEndsWithNoBalance {
         uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
         this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
@@ -1831,23 +1761,6 @@ contract GebIncentivesProxyActionsTest is GebDeployTestBase, ProxyCalls {
         assertTrue(incentives.rewardToken().balanceOf(address(this)) > 4.9999 ether); // 50% remains locked
         assertTrue(ethBalanceBeforeWithdraw < address(this).balance);
         assertEq(generatedDebt("ETH", manager.safes(safe)), 260000000000000000002);
-    }
-
-    function testExitRemoveLiquidityRepayDebtFreeETH() public assertProxyEndsWithNoBalance {
-        uint safe = this.openSAFE(address(manager), "ETH", address(proxy));
-        this.lockETH{value: 2 ether}(address(manager), address(ethJoin), safe);
-        assertEq(coin.balanceOf(address(this)), 0);
-        this.generateDebtAndProvideLiquidityStake{value: 2 ether}(address(manager), address(taxCollector), address(coinJoin), address(uniswapRouter), address(incentives), safe, 300 ether, [uint(1),1]);
-        hevm.warp(12 days);
-        uint lpTokenBalanceBeforeWithdraw = raiETHPair.balanceOf(address(this));
-        uint ethBalanceBeforeWithdraw = address(this).balance;
-        uint coinBalanceBeforeWithdraw = coin.balanceOf(address(this));
-        this.exitRemoveLiquidityRepayDebtFreeETH(address(manager), address(ethJoin), address(coinJoin), safe, address(incentives), 0.2 ether, address(uniswapRouter), [uint(1),1]);
-        assertEq(raiETHPair.balanceOf(address(this)), lpTokenBalanceBeforeWithdraw);
-        assertEq(coinBalanceBeforeWithdraw, coin.balanceOf(address(this)));
-        assertTrue(ethBalanceBeforeWithdraw < address(this).balance);
-        assertEq(generatedDebt("ETH", manager.safes(safe)), 260000000000000000002);
-        assertEq(lockedCollateral("ETH", manager.safes(safe)), 1.8 ether);
     }
 }
 
