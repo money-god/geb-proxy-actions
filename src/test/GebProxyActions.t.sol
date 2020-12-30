@@ -6,7 +6,7 @@ import "ds-token/token.sol";
 
 import {GebProxyActions, GebProxyActionsGlobalSettlement, GebProxyActionsCoinSavingsAccount, GebProxyIncentivesActions, GebProxyLeverageActions} from "../GebProxyActions.sol";
 
-import {GebDeployTestBase, EnglishCollateralAuctionHouse} from "geb-deploy/test/GebDeploy.t.base.sol";
+import {Feed, GebDeployTestBase, EnglishCollateralAuctionHouse} from "geb-deploy/test/GebDeploy.t.base.sol";
 import {DGD, GNT} from "./tokens.sol";
 import {CollateralJoin3, CollateralJoin4} from "geb-deploy/AdvancedTokenAdapters.sol";
 import {DSValue} from "ds-value/value.sol";
@@ -521,12 +521,18 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
     GebSafeManager manager;
 
     CollateralJoin3 dgdJoin;
+
     DGD dgd;
-    DSValue orclDGD;
+    Feed orclDGD;
+    Feed priceFeedDGD;
+
     EnglishCollateralAuctionHouse dgdEnglishCollateralAuctionHouse;
     CollateralJoin4 gntCollateralJoin;
+
     GNT gnt;
-    DSValue orclGNT;
+    Feed orclGNT;
+    Feed priceFeedGNT;
+
     GebProxyRegistry registry;
 
     bytes32 collateralAuctionType = bytes32("ENGLISH");
@@ -538,10 +544,16 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         // Add a token collateral
         dgd = new DGD(1000 * 10 ** 9);
         dgdJoin = new CollateralJoin3(address(safeEngine), "DGD", address(dgd), 9);
-        orclDGD = new DSValue();
-        gebDeploy.deployCollateral(bytes32("ENGLISH"), "DGD", address(dgdJoin), address(orclDGD), address(orclDGD), address(0));
+
+        orclDGD = new Feed();
+        priceFeedDGD = new Feed();
+        orclDGD.set_price_source(address(priceFeedDGD));
+        gebDeploy.deployCollateral(bytes32("ENGLISH"), "DGD", address(dgdJoin), address(orclDGD), address(0));
+
         (dgdEnglishCollateralAuctionHouse, ,) = gebDeploy.collateralTypes("DGD");
         orclDGD.updateResult(uint(50 ether)); // Price 50 COIN = 1 DGD (in precision 18)
+        priceFeedDGD.updateResult(uint(50 ether));
+
         this.modifyParameters(address(oracleRelayer), "DGD", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
         this.modifyParameters(address(oracleRelayer), "DGD", "liquidationCRatio", uint(1500000000 ether)); // Liquidation ratio 150%
 
@@ -552,9 +564,14 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
 
         gnt = new GNT(1000000 ether);
         gntCollateralJoin = new CollateralJoin4(address(safeEngine), "GNT", address(gnt));
-        orclGNT = new DSValue();
-        gebDeploy.deployCollateral(bytes32("ENGLISH"), "GNT", address(gntCollateralJoin), address(orclGNT), address(orclGNT), address(0));
+
+        orclGNT = new Feed();
+        priceFeedGNT = new Feed();
+        orclGNT.set_price_source(address(priceFeedGNT));
+        gebDeploy.deployCollateral(bytes32("ENGLISH"), "GNT", address(gntCollateralJoin), address(orclGNT), address(0));
+
         orclGNT.updateResult(uint(100 ether)); // Price 100 COIN = 1 GNT
+        priceFeedGNT.updateResult(uint(100 ether));
         this.modifyParameters(address(oracleRelayer), "GNT", "safetyCRatio", uint(1500000000 ether)); // Safety ratio 150%
         this.modifyParameters(address(oracleRelayer), "GNT", "liquidationCRatio", uint(1500000000 ether)); // Liquidation ratio 150%
 
@@ -1269,6 +1286,7 @@ contract GebProxyActionsTest is GebDeployTestBase, ProxyCalls {
         this.lockTokenCollateralAndGenerateDebt(address(manager), address(taxCollector), address(dgdJoin), address(coinJoin), safe, 1 * 10 ** 9, 30 ether, true);
 
         orclDGD.updateResult(uint(40 * 10 ** 18)); // Force liquidation
+        priceFeedDGD.updateResult(uint(40 * 10 ** 18));
         oracleRelayer.updateCollateralPrice("DGD");
         uint batchId = liquidationEngine.liquidateSAFE("DGD", manager.safes(safe));
 
