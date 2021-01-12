@@ -1664,6 +1664,21 @@ contract GebProxyIncentivesActions is BasicActions {
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
 
+    /// @notice Migrates from one campaign to another, claiming rewards
+    /// @param _oldIncentives Old liquidity mining pool
+    /// @param _newIncentives New liquidity mining pool
+    function migrateCampaign(address _oldIncentives, address _newIncentives) external {
+        GebIncentivesLike incentives = GebIncentivesLike(_oldIncentives);
+        DSTokenLike rewardToken = DSTokenLike(incentives.rewardsToken());
+        DSTokenLike lpToken = DSTokenLike(incentives.stakingToken());
+        incentives.exit();
+
+        GebIncentivesLike newIncentives = GebIncentivesLike(_newIncentives);
+        _stakeInMine(_newIncentives);
+
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
+    }
+
     /// @notice Withdraw LP tokens from liquidity mining pool
     /// @param incentives address - Liquidity mining pool
     /// @param value uint - value to withdraw
