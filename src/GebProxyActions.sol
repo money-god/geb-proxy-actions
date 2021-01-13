@@ -124,19 +124,13 @@ abstract contract ProxyRegistryLike {
 }
 
 abstract contract GebIncentivesLike {
-    function earned(address, uint256) virtual public view returns (uint256);
-    function rewardToken() virtual public returns (address);
-    function lpToken() virtual public returns (address);
+    function stakingToken() virtual public returns (address);
+    function rewardsToken() virtual public returns (address);
     function stake(uint256) virtual public;
     function withdraw(uint256) virtual public;
     function exit() virtual public;
     function balanceOf(address) virtual public view returns (uint256);
-    function getLockedReward(address, uint) virtual external;
-    function getReward(uint) virtual public;
-    function campaigns(uint) virtual public returns (uint, uint, uint, uint, uint, uint, uint, uint);
-    function userRewardPerTokenPaid(address, uint) virtual public returns (uint);
-    function delayedRewards(address,uint) virtual public view returns (uint, uint, uint);
-
+    function getReward() virtual public;
 }
 
 abstract contract ProxyLike {
@@ -1380,7 +1374,7 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @notice Stakes in Incentives Pool (geb-incentives)
     /// @param incentives address - Liquidity mining pool
     function _stakeInMine(address incentives) internal {
-        DSTokenLike lpToken = DSTokenLike(GebIncentivesLike(incentives).lpToken());
+        DSTokenLike lpToken = DSTokenLike(GebIncentivesLike(incentives).stakingToken());
         lpToken.approve(incentives, uint(0 - 1));
         GebIncentivesLike(incentives).stake(lpToken.balanceOf(address(this)));
     }
@@ -1618,7 +1612,7 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param incentives address - pool address
     /// @param wad uint - amount
     function stakeInMine(address incentives, uint wad) external {
-        DSTokenLike(GebIncentivesLike(incentives).lpToken()).transferFrom(msg.sender, address(this), wad);
+        DSTokenLike(GebIncentivesLike(incentives).stakingToken()).transferFrom(msg.sender, address(this), wad);
         _stakeInMine(incentives);
     }
 
@@ -1650,45 +1644,12 @@ contract GebProxyIncentivesActions is BasicActions {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
-    /// @notice Harvests rewards from liquidity mining pool
-    /// @param incentives address - Liquidity mining pool
-    /// @param campaignId uint - Id of the campaign to get rewards from
-    function harvestReward(address incentives, uint campaignId) external {
-        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
-        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
-        incentivesContract.getReward(campaignId);
-        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
-    }
-
-    /// @notice Gets vested rewards from liquidity mining campaign
-    /// @param incentives address - Liquidity mining pool
-    /// @param campaignId uint - Id of the campaign to get rewards from
-    function getLockedReward(address incentives, uint campaignId) external {
-        GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
-        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
-        incentivesContract.getLockedReward(address(this), campaignId);
-        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
-    }
-
     /// @notice Harvests rewards available (both instant and staked) 
     /// @param incentives address - Liquidity mining pool
-    /// @param campaignId uint - Id of the campaign to get rewards from
-    function getRewards(address incentives, uint campaignId) public {
+    function getRewards(address incentives) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
-        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
-
-        (,uint startTime, uint duration,,, uint rewardTokenStored,,) = incentivesContract.campaigns(campaignId);
-
-        if (startTime + duration >= block.timestamp || 
-            rewardTokenStored == 0 || 
-            incentivesContract.earned(address(this), campaignId) > 0) {
-            incentivesContract.getReward(campaignId);
-        } else {
-            (uint totalAmount, uint exitedAmount,) = incentivesContract.delayedRewards(address(this), campaignId);
-            if (totalAmount > exitedAmount)
-                incentivesContract.getLockedReward(address(this), campaignId);
-        }
-
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardsToken());
+        incentivesContract.getReward();
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
     }
 
@@ -1696,11 +1657,26 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param incentives address - Liquidity mining pool
     function exitMine(address incentives) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
-        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
-        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardsToken());
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.stakingToken());
         incentivesContract.exit();
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
+    }
+
+    /// @notice Migrates from one campaign to another, claiming rewards
+    /// @param _oldIncentives Old liquidity mining pool
+    /// @param _newIncentives New liquidity mining pool
+    function migrateCampaign(address _oldIncentives, address _newIncentives) external {
+        GebIncentivesLike incentives = GebIncentivesLike(_oldIncentives);
+        DSTokenLike rewardToken = DSTokenLike(incentives.rewardsToken());
+        DSTokenLike lpToken = DSTokenLike(incentives.stakingToken());
+        incentives.exit();
+
+        GebIncentivesLike newIncentives = GebIncentivesLike(_newIncentives);
+        _stakeInMine(_newIncentives);
+
+        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
     }
 
     /// @notice Withdraw LP tokens from liquidity mining pool
@@ -1708,7 +1684,7 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param value uint - value to withdraw
     function withdrawFromMine(address incentives, uint value) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
-        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.stakingToken());
         incentivesContract.withdraw(value);
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
@@ -1716,14 +1692,12 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @notice Withdraw LP tokens from liquidity mining pool and harvests rewards
     /// @param incentives address - Liquidity mining pool
     /// @param value uint - value to withdraw
-    /// @param campaignId uint - Id of the campaign to get rewards from
-    function withdrawAndHarvest(address incentives, uint value, uint campaignId) external {
+    function withdrawAndHarvest(address incentives, uint value) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
-        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
-        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardsToken());
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.stakingToken());
         incentivesContract.withdraw(value);
-        getRewards(incentives, campaignId);
-        rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
+        getRewards(incentives);
         lpToken.transfer(msg.sender, lpToken.balanceOf(address(this)));
     }
 
@@ -1732,14 +1706,13 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param systemCoin address
     /// @param value uint - value to withdraw
-    /// @param campaignId uint - Id of the campaign to get rewards from
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
-    function withdrawHarvestRemoveLiquidity(address incentives, address uniswapRouter, address systemCoin, uint value, uint campaignId, uint[2] memory minTokenAmounts) public returns (uint amountA, uint amountB) {
+    function withdrawHarvestRemoveLiquidity(address incentives, address uniswapRouter, address systemCoin, uint value, uint[2] memory minTokenAmounts) public returns (uint amountA, uint amountB) {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
-        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
-        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardsToken());
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.stakingToken());
         incentivesContract.withdraw(value);
-        getRewards(incentives, campaignId);
+        getRewards(incentives);
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         return _removeLiquidityUniswap(uniswapRouter, systemCoin, lpToken.balanceOf(address(this)), msg.sender, minTokenAmounts);
     }
@@ -1774,7 +1747,7 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function withdrawRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, uint value, address uniswapRouter, uint[2] calldata minTokenAmounts) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
-        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardsToken());
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         incentivesContract.withdraw(value);
 
@@ -1791,8 +1764,8 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function exitAndRemoveLiquidity(address coinJoin, address incentives, address uniswapRouter, uint[2] calldata minTokenAmounts) external returns (uint amountA, uint amountB) {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
-        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
-        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardsToken());
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.stakingToken());
         incentivesContract.exit();
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
         return _removeLiquidityUniswap(uniswapRouter, address(CoinJoinLike(coinJoin).systemCoin()), lpToken.balanceOf(address(this)), msg.sender, minTokenAmounts);
@@ -1808,8 +1781,8 @@ contract GebProxyIncentivesActions is BasicActions {
     function exitRemoveLiquidityRepayDebt(address manager, address coinJoin, uint safe, address incentives, address uniswapRouter, uint[2] calldata minTokenAmounts) external {
 
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
-        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardToken());
-        DSTokenLike lpToken = DSTokenLike(incentivesContract.lpToken());
+        DSTokenLike rewardToken = DSTokenLike(incentivesContract.rewardsToken());
+        DSTokenLike lpToken = DSTokenLike(incentivesContract.stakingToken());
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
         incentivesContract.exit();
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
