@@ -21,65 +21,126 @@ pragma solidity 0.6.7;
 // WARNING: These functions meant to be used as a a library for a DSProxy. Some are unsafe if you call them directly.
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-contract GebProxyDebtAuctionActions {
+abstract contract AccountingEngineLike {
+    function debtAuctionHouse() external virtual returns (address);
+    function surplusAuctionHouse() external virtual returns (address);
+    function auctionDebt() external virtual returns (uint256);
+    function auctionSurplus() external virtual returns (uint256);
+}
 
-    /// @notice Starts auction. Bids if auction started and soldAmount is lower than current bid
-    /// @param accountingEngine AccountingEngine
-    /// @param soldAmount Sold amount
-    function startAndDecraseSoldAmount(address accountingEngine, uint soldAmount) public {
-        // this will first call AccountingEngine.auctionDebt() and then call decreaseSoldAmount to bid in the auction
+abstract contract DebtAuctionHouseLike {
+    function bids(uint) external virtual returns (uint, uint, address, uint48, uint48);
+    function decreaseSoldAmount(uint256, uint256, uint256) external virtual;
+    function restartAuction(uint256) external virtual;
+    function settleAuction(uint256) external virtual;
+    function protocolToken() external virtual returns (address);
+}
+
+abstract contract SurplusAuctionHouseLike {
+    function bids(uint) external virtual returns (uint, uint, address, uint48, uint48);
+    function increaseBidSize(uint256 id, uint256 amountToBuy, uint256 bid) external virtual;
+    function restartAuction(uint256) external virtual;
+    function settleAuction(uint256) external virtual;
+}
+
+abstract contract DSTokenLike {
+    function balanceOf(address) external virtual returns (uint);
+    function transfer(address, uint) external virtual returns (bool);
+    function transferFrom(address, address, uint) external virtual returns (bool);
+    function move(address, address, uint) external virtual returns (bool);
+    function approve(address, uint) external virtual returns (bool);
+}
+
+contract Common {
+    /// @notice Claims the full balance of any ERC20 token in the proxy's balance
+    /// @param tokenAddress Address of the token
+    function claimProxyFunds(address tokenAddress) public {
+        DSTokenLike token = DSTokenLike(tokenAddress);
+        token.transfer(msg.sender, token.balanceOf(address(this)));
     }
 
-    /// @notice Bids on debt auctions
-    /// @param accountingEngine AccountingEngine
+    /// @notice Claims the full balance of several ERC20 tokens in the proxy's balance
+    /// @param tokenAddresses Addresses of the tokens
+    function claimProxyFunds(address[] memory tokenAddresses) public {
+        for (uint i = 0; i < tokenAddresses.length; i++)
+            claimProxyFunds(tokenAddresses[i]);
+    }
+}
+
+contract GebProxyDebtAuctionActions is Common {
+
+    /// @notice Starts auction and bids
+    /// @param accountingEngineAddress AccountingEngine
+    /// @param amountToBuy Sold amount
+    function startAndDecraseSoldAmount(address accountingEngineAddress, uint amountToBuy) public {
+        AccountingEngineLike accountingEngine = AccountingEngineLike(accountingEngineAddress);
+        DebtAuctionHouseLike debtAuctionHouse = DebtAuctionHouseLike(accountingEngine.debtAuctionHouse());
+        uint auctionId = accountingEngine.auctionDebt();
+        (uint bidAmount,,,,) = debtAuctionHouse.bids(auctionId);
+        debtAuctionHouse.decreaseSoldAmount(auctionId, amountToBuy, bidAmount);
+    }
+
+    /// @notice Bids on auction. Restarts the auction if necessary
+    /// @param auctionHouse Auction house address
     /// @param auctionId Auction Id
-    /// @param soldAmount Sold amount
-    function decreaseSoldAmount(address accountingEngine, uint auctionId, uint soldAmount) public {
-        // simply bids in a debt auction; you must handle 2 cases: the auction is ongoing and you simply bid (offer RAI); the auction expired because no one bid in it so you first need to call restartAuction and then bid in it
+    /// @param amountToBuy Sold amount
+    function decreaseSoldAmount(address auctionHouse, uint auctionId, uint amountToBuy) public {
+        DebtAuctionHouseLike debtAuctionHouse = DebtAuctionHouseLike(auctionHouse);
+        (uint bid,,, uint48 bidExpiry, uint48 auctionDeadline) = debtAuctionHouse.bids(auctionId); 
+        
+        if (auctionDeadline < now && bidExpiry == 0) {
+            debtAuctionHouse.restartAuction(auctionId);
+        }       
+        debtAuctionHouse.decreaseSoldAmount(auctionId, amountToBuy, bid);
     }
 
     /// @notice Mints FLX for your proxy and then the proxy sends all of its FLX balance to you
-    /// @param accountingEngine AccountingEngine
+    /// @param auctionHouse Auction house address
     /// @param auctionId Auction Id
-    function settleAuction(address accountingEngine, uint auctionId) public {
-        // mints FLX for your proxy and then the proxy sends all of its FLX balance to you
+    function settleAuction(address auctionHouse, uint auctionId) public {
+        DebtAuctionHouseLike debtAuctionHouse = DebtAuctionHouseLike(auctionHouse);
+        debtAuctionHouse.settleAuction(auctionId);
+        DSTokenLike protocolToken = DSTokenLike(debtAuctionHouse.protocolToken());
+        protocolToken.transfer(msg.sender, protocolToken.balanceOf(address(this)));
     }
-
-    /// @notice Claims the full FLX and RAI balances of your proxy and sends them to you
-    function claimProxyFunds() public {
-        // claims the full FLX and RAI balances of your proxy and sends them to you
-    }
-
 }
 
-contract GebProxySurplusAuctionActions {
+contract GebProxySurplusAuctionActions is Common {
 
-    /// @notice Starts auction and increases bid size. Bids if auction started and bidSize is larger than current bid
-    /// @param accountingEngine AccountingEngine
-    /// @param bidSize Bid size
-    function startAndIncreaseBidSize(address accountingEngine, uint bidSize) public {
+    /// @notice Starts surplus auction and bids
+    /// @param accountingEngineAddress AccountingEngine
+    /// @param bidAmount Bid size
+    function startAndIncreaseBidSize(address accountingEngineAddress, uint bidAmount) public {
         // this will first call AccountingEngine.auctionSurplus() and then call increaseBidSize to bid in the auction
+        AccountingEngineLike accountingEngine = AccountingEngineLike(accountingEngineAddress);
+        SurplusAuctionHouseLike surplusAuctionHouse = SurplusAuctionHouseLike(accountingEngine.surplusAuctionHouse());
+        uint auctionId = accountingEngine.auctionSurplus();
+        (, uint amountToBuy,,,) = surplusAuctionHouse.bids(auctionId);
+        surplusAuctionHouse.increaseBidSize(auctionId, amountToBuy, bidAmount);
     }
 
-    /// @notice Starts auction and increases bid size. Bids if auction started and bidSize is larger than current bid
-    /// @param accountingEngine AccountingEngine
+    /// @notice Bids in auction. Restarts the auction if necessary
+    /// @param auctionHouse Auction house address
     /// @param auctionId Auction Id
     /// @param bidSize Bid size
-    function increaseBidSize(address accountingEngine, uint auctionId, uint bidSize) public {
-        // simply bids in a debt auction; you must handle 2 cases: the auction is ongoing and you simply bid (offer FLX); the auction expired because no one bid in it so you first need to call restartAuction and then bid in it
+    function increaseBidSize(address auctionHouse, uint auctionId, uint bidSize) public {
+        SurplusAuctionHouseLike surplusAuctionHouse = SurplusAuctionHouseLike(auctionHouse);
+        (, uint amountToBuy,, uint48 bidExpiry, uint48 auctionDeadline) = surplusAuctionHouse.bids(auctionId); 
+        
+        if (auctionDeadline < now && bidExpiry == 0) {
+            surplusAuctionHouse.restartAuction(auctionId);
+        }       
+        surplusAuctionHouse.increaseBidSize(auctionId, amountToBuy, bidSize);
     }
 
-    /// @notice Starts auction and increases bid size. Bids if auction started and bidSize is larger than current bid
-    /// @param accountingEngine AccountingEngine
+    /// @notice Mints FLX for your proxy and then the proxy sends all of its FLX balance to you
+    /// @param auctionHouse Auction house address
     /// @param auctionId Auction Id
-    function settleAuction(address accountingEngine, uint auctionId) public {
-        // gives RAI to your proxy and then the proxy sends all of its RAI balance to you
-    }
+    function settleAuction(address auctionHouse, uint auctionId) public {
+        SurplusAuctionHouseLike surplusAuctionHouse = SurplusAuctionHouseLike(auctionHouse);
+        surplusAuctionHouse.settleAuction(auctionId);
 
-    /// @notice Claims the full FLX and RAI balances of your proxy and sends them to you
-    function claimProxyFunds() public {
-        // claims the full FLX and RAI balances of your proxy and sends them to you
+        // need to exit RAI from the system here
     }
-
 }
 

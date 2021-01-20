@@ -5,26 +5,26 @@ import "ds-test/test.sol";
 import "ds-weth/weth9.sol";
 import "ds-token/token.sol";
 
-import {GebProxySurplusAuctionActions, GebProxyDebtAuctionActions} from "../GebProxyAuctionActions.sol";
-import {GebProxyRegistry, DSProxyFactory, DSProxy} from "geb-proxy-registry/GebProxyRegistry.sol";
+import {GebProxyDebtAuctionActions, GebProxySurplusAuctionActions} from "../gebProxyAuctionActions.sol";
+
+import {Feed, GebDeployTestBase, EnglishCollateralAuctionHouse} from "geb-deploy/test/GebDeploy.t.base.sol";
+import {DGD, GNT} from "./tokens.sol";
+import {CollateralJoin3, CollateralJoin4} from "geb-deploy/AdvancedTokenAdapters.sol";
+import {DSValue} from "ds-value/value.sol";
 import {GebSafeManager} from "geb-safe-manager/GebSafeManager.sol";
-
-import {Feed, GebDeployTestBase} from "geb-deploy/test/GebDeploy.t.base.sol";
-
-import "../uni/UniswapV2Factory.sol";
-import "../uni/UniswapV2Pair.sol";
-import "../uni/UniswapV2Router02.sol";
+import {GetSafes} from "geb-safe-manager/GetSafes.sol";
+import {GebProxyRegistry, DSProxyFactory, DSProxy} from "geb-proxy-registry/GebProxyRegistry.sol";
 
 contract ProxyCalls {
     DSProxy proxy;
-    address GebProxyAuctionActions;
-
+    address gebProxyAuctionActions;
 }
 
-contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, ProxyCalls {
+contract GebProxyLeverageActionsTest is GebDeployTestBase, ProxyCalls {
     GebSafeManager manager;
 
     GebProxyRegistry registry;
+
     bytes32 collateralAuctionType = bytes32("ENGLISH");
 
     function setUp() override public {
@@ -34,25 +34,17 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, ProxyCalls {
         manager = new GebSafeManager(address(safeEngine));
         DSProxyFactory factory = new DSProxyFactory();
         registry = new GebProxyRegistry(address(factory));
-        GebProxyAuctionActions = address(new GebProxyDebtAuctionActions());
+        gebProxyAuctionActions = address(new GebProxyDebtAuctionActions());
         proxy = DSProxy(registry.build());
+
+        this.modifyParameters(address(accountingEngine), "debtAuctionBidSize", uint(1 ether));
+
+
     }
-}
 
-contract GebProxySurplusAuctionActionsTest is GebDeployTestBase, ProxyCalls {
-    GebSafeManager manager;
-
-    GebProxyRegistry registry;
-    bytes32 collateralAuctionType = bytes32("ENGLISH");
-
-    function setUp() override public {
-        super.setUp();
-        deployStableKeepAuth(collateralAuctionType);
-
-        manager = new GebSafeManager(address(safeEngine));
-        DSProxyFactory factory = new DSProxyFactory();
-        registry = new GebProxyRegistry(address(factory));
-        GebProxyAuctionActions = address(new GebProxySurplusAuctionActions());
-        proxy = DSProxy(registry.build());
+    function test_sanity() public {
+        assertTrue(true);
     }
+
+
 }
