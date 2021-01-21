@@ -17,6 +17,8 @@
 
 pragma solidity 0.6.7;
 
+import "./GebProxyActions.sol";
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // WARNING: These functions meant to be used as a a library for a DSProxy. Some are unsafe if you call them directly.
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -41,17 +43,11 @@ abstract contract SurplusAuctionHouseLike {
     function increaseBidSize(uint256 id, uint256 amountToBuy, uint256 bid) external virtual;
     function restartAuction(uint256) external virtual;
     function settleAuction(uint256) external virtual;
+    function protocolToken() external virtual returns (address);
 }
 
-abstract contract DSTokenLike {
-    function balanceOf(address) external virtual returns (uint);
-    function transfer(address, uint) external virtual returns (bool);
-    function transferFrom(address, address, uint) external virtual returns (bool);
-    function move(address, address, uint) external virtual returns (bool);
-    function approve(address, uint) external virtual returns (bool);
-}
+contract AuctionCommon {
 
-contract Common {
     /// @notice Claims the full balance of any ERC20 token in the proxy's balance
     /// @param tokenAddress Address of the token
     function claimProxyFunds(address tokenAddress) public {
@@ -67,31 +63,53 @@ contract Common {
     }
 }
 
-contract GebProxyDebtAuctionActions is Common {
+contract GebProxyDebtAuctionActions is Common, AuctionCommon {
+    event log(uint);
 
     /// @notice Starts auction and bids
+    /// @param coinJoin CoinJoin
     /// @param accountingEngineAddress AccountingEngine
-    /// @param amountToBuy Sold amount
-    function startAndDecraseSoldAmount(address accountingEngineAddress, uint amountToBuy) public {
+    /// @param amountToBuy Amount to Buy
+    function startAndDecraseSoldAmount(address coinJoin, address accountingEngineAddress, uint amountToBuy) public {
         AccountingEngineLike accountingEngine = AccountingEngineLike(accountingEngineAddress);
         DebtAuctionHouseLike debtAuctionHouse = DebtAuctionHouseLike(accountingEngine.debtAuctionHouse());
+        SAFEEngineLike safeEngine = SAFEEngineLike(CoinJoinLike(coinJoin).safeEngine());
+
+        // Starts auction
         uint auctionId = accountingEngine.auctionDebt();
         (uint bidAmount,,,,) = debtAuctionHouse.bids(auctionId);
+        // Joins system
+        coinJoin_join(coinJoin, address(this), amountToBuy);
+        // Allows auctionHouse to access to proxy's COIN balance in the safeEngine
+        if (safeEngine.canModifySAFE(address(this), address(debtAuctionHouse)) == 0) {
+            safeEngine.approveSAFEModification(address(debtAuctionHouse));
+        }
+        // Bid
         debtAuctionHouse.decreaseSoldAmount(auctionId, amountToBuy, bidAmount);
     }
 
     /// @notice Bids on auction. Restarts the auction if necessary
+    /// @param coinJoin CoinJoin
     /// @param auctionHouse Auction house address
     /// @param auctionId Auction Id
-    /// @param amountToBuy Sold amount
-    function decreaseSoldAmount(address auctionHouse, uint auctionId, uint amountToBuy) public {
+    /// @param amountToBuy Amount to Buy
+    function decreaseSoldAmount(address coinJoin, address auctionHouse, uint auctionId, uint amountToBuy) public {
         DebtAuctionHouseLike debtAuctionHouse = DebtAuctionHouseLike(auctionHouse);
-        (uint bid,,, uint48 bidExpiry, uint48 auctionDeadline) = debtAuctionHouse.bids(auctionId); 
-        
+        SAFEEngineLike safeEngine = SAFEEngineLike(CoinJoinLike(coinJoin).safeEngine());
+
+        (uint bidAmount,,, uint48 bidExpiry, uint48 auctionDeadline) = debtAuctionHouse.bids(auctionId); 
+        // Joins system
+        coinJoin_join(coinJoin, address(this), amountToBuy);
+        // Allows auctionHouse to access to proxy's COIN balance in the safeEngine
+        if (safeEngine.canModifySAFE(address(this), address(debtAuctionHouse)) == 0) {
+            safeEngine.approveSAFEModification(address(debtAuctionHouse));
+        }
+        // Restarts auction if inactive
         if (auctionDeadline < now && bidExpiry == 0) {
             debtAuctionHouse.restartAuction(auctionId);
-        }       
-        debtAuctionHouse.decreaseSoldAmount(auctionId, amountToBuy, bid);
+        }
+        //Bid
+        debtAuctionHouse.decreaseSoldAmount(auctionId, amountToBuy, bidAmount);
     }
 
     /// @notice Mints FLX for your proxy and then the proxy sends all of its FLX balance to you
@@ -105,18 +123,23 @@ contract GebProxyDebtAuctionActions is Common {
     }
 }
 
-contract GebProxySurplusAuctionActions is Common {
+contract GebProxySurplusAuctionActions is Common, AuctionCommon {
 
     /// @notice Starts surplus auction and bids
     /// @param accountingEngineAddress AccountingEngine
-    /// @param bidAmount Bid size
-    function startAndIncreaseBidSize(address accountingEngineAddress, uint bidAmount) public {
-        // this will first call AccountingEngine.auctionSurplus() and then call increaseBidSize to bid in the auction
+    /// @param bidSize Bid size
+    function startAndIncreaseBidSize(address accountingEngineAddress, uint bidSize) public {
         AccountingEngineLike accountingEngine = AccountingEngineLike(accountingEngineAddress);
         SurplusAuctionHouseLike surplusAuctionHouse = SurplusAuctionHouseLike(accountingEngine.surplusAuctionHouse());
+        DSTokenLike protocolToken = DSTokenLike(surplusAuctionHouse.protocolToken());
+
+        // Starts auction
         uint auctionId = accountingEngine.auctionSurplus();
-        (, uint amountToBuy,,,) = surplusAuctionHouse.bids(auctionId);
-        surplusAuctionHouse.increaseBidSize(auctionId, amountToBuy, bidAmount);
+        require(protocolToken.transferFrom(msg.sender, address(this), bidSize), "geb-proxy-auction-actions/transfer-from-failed");
+        protocolToken.approve(address(surplusAuctionHouse), bidSize);
+        (, uint amountToSell,,,) = surplusAuctionHouse.bids(auctionId);
+        // Bid
+        surplusAuctionHouse.increaseBidSize(auctionId, amountToSell, bidSize);
     }
 
     /// @notice Bids in auction. Restarts the auction if necessary
@@ -125,22 +148,35 @@ contract GebProxySurplusAuctionActions is Common {
     /// @param bidSize Bid size
     function increaseBidSize(address auctionHouse, uint auctionId, uint bidSize) public {
         SurplusAuctionHouseLike surplusAuctionHouse = SurplusAuctionHouseLike(auctionHouse);
-        (, uint amountToBuy,, uint48 bidExpiry, uint48 auctionDeadline) = surplusAuctionHouse.bids(auctionId); 
-        
+        DSTokenLike protocolToken = DSTokenLike(surplusAuctionHouse.protocolToken());
+
+        require(protocolToken.transferFrom(msg.sender, address(this), bidSize), "geb-proxy-auction-actions/transfer-from-failed");
+        protocolToken.approve(address(surplusAuctionHouse), bidSize);
+        // Restarts auction if inactive
+        (, uint amountToSell,, uint48 bidExpiry, uint48 auctionDeadline) = surplusAuctionHouse.bids(auctionId); 
         if (auctionDeadline < now && bidExpiry == 0) {
             surplusAuctionHouse.restartAuction(auctionId);
-        }       
-        surplusAuctionHouse.increaseBidSize(auctionId, amountToBuy, bidSize);
+        }      
+        // Bid 
+        surplusAuctionHouse.increaseBidSize(auctionId, amountToSell, bidSize);
     }
 
     /// @notice Mints FLX for your proxy and then the proxy sends all of its FLX balance to you
+    /// @param coinJoin CoinJoin
     /// @param auctionHouse Auction house address
     /// @param auctionId Auction Id
-    function settleAuction(address auctionHouse, uint auctionId) public {
+    function settleAuction(address coinJoin, address auctionHouse, uint auctionId) public {
         SurplusAuctionHouseLike surplusAuctionHouse = SurplusAuctionHouseLike(auctionHouse);
+        SAFEEngineLike safeEngine = SAFEEngineLike(CoinJoinLike(coinJoin).safeEngine());
+        (, uint amountToBuy,,,) = surplusAuctionHouse.bids(auctionId); 
+        // Settle auction
         surplusAuctionHouse.settleAuction(auctionId);
-
-        // need to exit RAI from the system here
+        // Allows coinJoin to access to proxy's COIN balance in the safeEngine
+        if (safeEngine.canModifySAFE(address(this), address(coinJoin)) == 0) {
+            safeEngine.approveSAFEModification(address(coinJoin));
+        }
+        // Exits Coin to the owner
+        CoinJoinLike(coinJoin).exit(msg.sender, amountToBuy / 10**27); // wad
     }
 }
 

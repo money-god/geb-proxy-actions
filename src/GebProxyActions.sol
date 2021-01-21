@@ -71,8 +71,8 @@ abstract contract GNTJoinLike {
 abstract contract DSTokenLike {
     function balanceOf(address) virtual public view returns (uint);
     function approve(address, uint) virtual public;
-    function transfer(address, uint) virtual public;
-    function transferFrom(address, address, uint) virtual public;
+    function transfer(address, uint) virtual public returns (bool);
+    function transferFrom(address, address, uint) virtual public returns (bool);
 }
 
 abstract contract WethLike {
