@@ -5,7 +5,7 @@ import "ds-test/test.sol";
 import "ds-weth/weth9.sol";
 import "ds-token/token.sol";
 
-import {GebProxyDebtAuctionActions, GebProxySurplusAuctionActions} from "../gebProxyAuctionActions.sol";
+import {GebProxyDebtAuctionActions, GebProxySurplusAuctionActions} from "../GebProxyAuctionActions.sol";
 
 import {Feed, GebDeployTestBase, EnglishCollateralAuctionHouse} from "geb-deploy/test/GebDeploy.t.base.sol";
 import {DGD, GNT} from "./tokens.sol";
@@ -79,7 +79,7 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
         this.modifyParameters(address(accountingEngine), "debtAuctionBidSize", debtAuctionBidSize);
         this.modifyParameters(address(accountingEngine), "initialDebtAuctionMintedTokens", uint(10 ether));
         safeEngine.createUnbackedDebt(address(accountingEngine), address(this), 100 * 10**45);
-        
+
         safeEngine.approveSAFEModification(address(coinJoin));
 
         coinJoin.exit(address(this), 100 ether);
@@ -161,7 +161,7 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
 
         assertEq(prot.balanceOf(address(this)), balance);
         assertEq(prot.balanceOf(address(proxy)), 0);
-    } 
+    }
 
     address[] public tokenAddresses;
     function testClaimProxyFundsMultiple() public {
@@ -181,7 +181,7 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
 
         assertEq(prot.balanceOf(address(this)), protBalance);
         assertEq(coin.balanceOf(address(this)), coinBalance);
-    } 
+    }
 }
 
 contract GebProxySurplusAuctionActionsTest is GebDeployTestBase, SurplusProxyCalls {
