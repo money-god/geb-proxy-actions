@@ -19,7 +19,7 @@ contract DebtProxyCalls {
     DSProxy proxy;
     address gebProxyAuctionActions;
 
-    function startAndDecraseSoldAmount(address, address, uint) public {
+    function startAndDecreaseSoldAmount(address, address, uint) public {
         proxy.execute(gebProxyAuctionActions, msg.data);
     }
 
@@ -27,7 +27,7 @@ contract DebtProxyCalls {
         proxy.execute(gebProxyAuctionActions, msg.data);
     }
 
-    function settleAuction(address, uint) public {
+    function settleAuction(address, address, uint) public {
         proxy.execute(gebProxyAuctionActions, msg.data);
     }
 
@@ -85,9 +85,9 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
         coinJoin.exit(address(this), 100 ether);
     }
 
-    function testStartAndDecraseSoldAmount() public {
+    function testStartAndDecreaseSoldAmount() public {
         coin.approve(address(proxy), debtAuctionBidSize);
-        this.startAndDecraseSoldAmount(address(coinJoin), address(accountingEngine), 8 ether);
+        this.startAndDecreaseSoldAmount(address(coinJoin), address(accountingEngine), 8 ether);
 
         (uint bidAmount, uint amountToBuy, address highBidder,,)
             = debtAuctionHouse.bids(1);
@@ -98,7 +98,7 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
         assertEq(amountToBuy, 8 ether);
     }
 
-    function testDecraseSoldAmountOngoingAuction() public {
+    function testDecreaseSoldAmountOngoingAuction() public {
         uint auctionId = accountingEngine.auctionDebt();
 
         coin.approve(address(proxy), debtAuctionBidSize);
@@ -113,7 +113,7 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
         assertEq(amountToBuy, 8 ether);
     }
 
-    function testDecraseSoldAmountExpiredAuction() public {
+    function testDecreaseSoldAmountExpiredAuction() public {
         uint auctionId = accountingEngine.auctionDebt();
         (,,,, uint48 auctionDeadline) = debtAuctionHouse.bids(auctionId);
 
@@ -132,7 +132,7 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
 
     function testSettleAuction() public {
         coin.approve(address(proxy), debtAuctionBidSize);
-        this.startAndDecraseSoldAmount(address(coinJoin), address(accountingEngine), 8 ether);
+        this.startAndDecreaseSoldAmount(address(coinJoin), address(accountingEngine), 8 ether);
 
         (,,,,uint48 auctionDeadline)
             = debtAuctionHouse.bids(1);
@@ -141,11 +141,12 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
 
         uint previousBalance = prot.balanceOf(address(this));
 
-        this.settleAuction(address(debtAuctionHouse), 1);
+        this.settleAuction(address(coinJoin), address(debtAuctionHouse), 1);
 
         assertEq(debtAuctionHouse.activeDebtAuctions(), 0);
         assertEq(prot.balanceOf(address(this)), previousBalance + 8 ether);
         assertEq(prot.balanceOf(address(proxy)), 0);
+        assertEq(coin.balanceOf(address(proxy)), 0);
     }
 
     function testClaimProxyFunds() public {
@@ -166,9 +167,6 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
     function testClaimProxyFundsMultiple() public {
         uint protBalance = prot.balanceOf(address(this));
         uint coinBalance = coin.balanceOf(address(this));
-
-        emit log_named_uint("protBalance", protBalance);
-        emit log_named_uint("coinBalance", coinBalance);
 
         prot.transfer(address(proxy), protBalance);
         coin.transfer(address(proxy), coinBalance);
@@ -265,7 +263,7 @@ contract GebProxySurplusAuctionActionsTest is GebDeployTestBase, SurplusProxyCal
         assertEq(amountToSell, surplusAuctionAmountToSell);
     }
 
-    function testSettleAuction2() public {
+    function testSettleAuction() public {
         prot.approve(address(proxy), surplusAuctionAmountToSell);
         this.startAndIncreaseBidSize(address(accountingEngine), 8 ether);
 
@@ -278,5 +276,6 @@ contract GebProxySurplusAuctionActionsTest is GebDeployTestBase, SurplusProxyCal
 
         assertEq(coin.balanceOf(address(this)), surplusAuctionAmountToSell / 10**27);
         assertEq(coin.balanceOf(address(proxy)), 0);
+        assertEq(prot.balanceOf(address(proxy)), 0);
     }
 }

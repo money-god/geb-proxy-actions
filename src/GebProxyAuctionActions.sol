@@ -61,16 +61,24 @@ contract AuctionCommon {
         for (uint i = 0; i < tokenAddresses.length; i++)
             claimProxyFunds(tokenAddresses[i]);
     }
+
+    // --- Utils ---
+    function both(bool x, bool y) internal pure returns (bool z) {
+        assembly{ z := and(x, y)}
+    }
+
+    function toWad(uint rad) internal pure returns (uint wad) {
+        wad = rad / 10**27;
+    }
 }
 
 contract GebProxyDebtAuctionActions is Common, AuctionCommon {
-    event log(uint);
 
     /// @notice Starts auction and bids
     /// @param coinJoin CoinJoin
     /// @param accountingEngineAddress AccountingEngine
     /// @param amountToBuy Amount to Buy
-    function startAndDecraseSoldAmount(address coinJoin, address accountingEngineAddress, uint amountToBuy) public {
+    function startAndDecreaseSoldAmount(address coinJoin, address accountingEngineAddress, uint amountToBuy) public {
         AccountingEngineLike accountingEngine = AccountingEngineLike(accountingEngineAddress);
         DebtAuctionHouseLike debtAuctionHouse = DebtAuctionHouseLike(accountingEngine.debtAuctionHouse());
         SAFEEngineLike safeEngine = SAFEEngineLike(CoinJoinLike(coinJoin).safeEngine());
@@ -105,21 +113,22 @@ contract GebProxyDebtAuctionActions is Common, AuctionCommon {
             safeEngine.approveSAFEModification(address(debtAuctionHouse));
         }
         // Restarts auction if inactive
-        if (auctionDeadline < now && bidExpiry == 0) {
+        if (both(auctionDeadline < now, bidExpiry == 0)) {
             debtAuctionHouse.restartAuction(auctionId);
         }
         //Bid
         debtAuctionHouse.decreaseSoldAmount(auctionId, amountToBuy, bidAmount);
     }
 
-    /// @notice Mints FLX for your proxy and then the proxy sends all of its FLX balance to you
+    /// @notice Mints Protocol token for your proxy and then the proxy sends all of its balance to msg.sender
+    /// @param coinJoin CoinJoin
     /// @param auctionHouse Auction house address
     /// @param auctionId Auction Id
-    function settleAuction(address auctionHouse, uint auctionId) public {
+    function settleAuction(address coinJoin, address auctionHouse, uint auctionId) public {
         DebtAuctionHouseLike debtAuctionHouse = DebtAuctionHouseLike(auctionHouse);
         debtAuctionHouse.settleAuction(auctionId);
-        DSTokenLike protocolToken = DSTokenLike(debtAuctionHouse.protocolToken());
-        protocolToken.transfer(msg.sender, protocolToken.balanceOf(address(this)));
+        claimProxyFunds(address(CoinJoinLike(coinJoin).systemCoin()));
+        claimProxyFunds(debtAuctionHouse.protocolToken());
     }
 }
 
@@ -161,7 +170,7 @@ contract GebProxySurplusAuctionActions is Common, AuctionCommon {
         surplusAuctionHouse.increaseBidSize(auctionId, amountToSell, bidSize);
     }
 
-    /// @notice Mints FLX for your proxy and then the proxy sends all of its FLX balance to you
+    /// @notice Mints system coin for your proxy and then the proxy sends all of its balance to msg.sender
     /// @param coinJoin CoinJoin
     /// @param auctionHouse Auction house address
     /// @param auctionId Auction Id
@@ -175,8 +184,9 @@ contract GebProxySurplusAuctionActions is Common, AuctionCommon {
         if (safeEngine.canModifySAFE(address(this), address(coinJoin)) == 0) {
             safeEngine.approveSAFEModification(address(coinJoin));
         }
-        // Exits Coin to the owner
-        CoinJoinLike(coinJoin).exit(msg.sender, amountToBuy / 10**27); // wad
+        // Exits Coin and Protocol token to the owner
+        CoinJoinLike(coinJoin).exit(msg.sender, toWad(amountToBuy));
+        claimProxyFunds(surplusAuctionHouse.protocolToken());
     }
 }
 
