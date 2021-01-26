@@ -87,7 +87,7 @@ contract GebProxyDebtAuctionActions is Common, AuctionCommon {
         uint auctionId = accountingEngine.auctionDebt();
         (uint bidAmount,,,,) = debtAuctionHouse.bids(auctionId);
         // Joins system coins
-        coinJoin_join(coinJoin, address(this), amountToBuy);
+        coinJoin_join(coinJoin, address(this), toWad(bidAmount));
         // Allows auction house to access to proxy's COIN balance in the SAFEEngine
         if (safeEngine.canModifySAFE(address(this), address(debtAuctionHouse)) == 0) {
             safeEngine.approveSAFEModification(address(debtAuctionHouse));
@@ -107,7 +107,7 @@ contract GebProxyDebtAuctionActions is Common, AuctionCommon {
 
         (uint bidAmount,,, uint48 bidExpiry, uint48 auctionDeadline) = debtAuctionHouse.bids(auctionId);
         // Joins system coins
-        coinJoin_join(coinJoin, address(this), amountToBuy);
+        coinJoin_join(coinJoin, address(this), toWad(bidAmount));
         // Allows auction house to access to proxy's COIN balance in the SAFEEngine
         if (safeEngine.canModifySAFE(address(this), address(debtAuctionHouse)) == 0) {
             safeEngine.approveSAFEModification(address(debtAuctionHouse));
