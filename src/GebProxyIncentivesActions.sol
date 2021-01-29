@@ -361,11 +361,12 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param _newIncentives New liquidity mining pool
     function migrateCampaign(address _oldIncentives, address _newIncentives) external {
         GebIncentivesLike incentives = GebIncentivesLike(_oldIncentives);
+        GebIncentivesLike newIncentives = GebIncentivesLike(_newIncentives);
+        require(incentives.stakingToken() == newIncentives.stakingToken(), "geb-incentives/mismatched-staking-tokens");
         DSTokenLike rewardToken = DSTokenLike(incentives.rewardsToken());
         DSTokenLike lpToken = DSTokenLike(incentives.stakingToken());
         incentives.exit();
 
-        GebIncentivesLike newIncentives = GebIncentivesLike(_newIncentives);
         _stakeInMine(_newIncentives);
 
         rewardToken.transfer(msg.sender, rewardToken.balanceOf(address(this)));
