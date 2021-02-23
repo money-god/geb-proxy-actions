@@ -130,6 +130,23 @@ contract GebProxyDebtAuctionActions is Common, AuctionCommon {
         claimProxyFunds(address(CoinJoinLike(coinJoin).systemCoin()));
         claimProxyFunds(debtAuctionHouse.protocolToken());
     }
+
+    /// @notice Exits Coin to proxy owner
+    /// @param coinJoin CoinJoin
+    /// @param wad Amount to exit
+    function exitCoin(address coinJoin, uint wad) public {
+        // Allows adapter to access to proxy's COIN balance in the safeEngine
+        if (CoinJoinLike(coinJoin).safeEngine().canModifySAFE(address(this), address(coinJoin)) == 0) {
+            CoinJoinLike(coinJoin).safeEngine().approveSAFEModification(coinJoin);
+        }
+        CoinJoinLike(coinJoin).exit(msg.sender, wad);
+    }
+
+    /// @notice Exits full Coin balance to proxy owner
+    /// @param coinJoin CoinJoin
+    function exitAllCoin(address coinJoin) public {
+        exitCoin(coinJoin, CoinJoinLike(coinJoin).safeEngine().coinBalance(address(this)) / RAY);
+    }
 }
 
 contract GebProxySurplusAuctionActions is Common, AuctionCommon {

@@ -37,6 +37,14 @@ contract DebtProxyCalls {
     function claimProxyFunds(address[] memory) public {
         proxy.execute(gebProxyAuctionActions, msg.data);
     }
+
+    function exitCoin(address, uint) public {
+        proxy.execute(gebProxyAuctionActions, msg.data);
+    }
+
+    function exitAllCoin(address) public {
+        proxy.execute(gebProxyAuctionActions, msg.data);
+    }
 }
 
 contract SurplusProxyCalls {
@@ -180,6 +188,34 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
 
         assertEq(prot.balanceOf(address(this)), protBalance);
         assertEq(coin.balanceOf(address(this)), coinBalance);
+    }
+
+    function testExitCoin() public {
+        uint joinAmount = 10 ether;
+        uint exitAmount = 6 ether;
+        coin.approve(address(coinJoin), joinAmount);
+        coinJoin.join(address(proxy), joinAmount);
+
+        assertEq(safeEngine.coinBalance(address(proxy)), rad(joinAmount));
+        uint previousBalance = coin.balanceOf(address(this));
+
+        this.exitCoin(address(coinJoin), exitAmount);
+        assertEq(safeEngine.coinBalance(address(proxy)), rad(joinAmount - exitAmount));
+        assertEq(coin.balanceOf(address(this)), previousBalance + exitAmount);
+    }
+
+    function testExitAllCoin() public {
+        uint joinAmount = 10 ether;
+        uint initialBalance = coin.balanceOf(address(this));
+        coin.approve(address(coinJoin), joinAmount);
+        coinJoin.join(address(proxy), joinAmount);
+
+        assertEq(safeEngine.coinBalance(address(proxy)), rad(joinAmount));
+        assertEq(coin.balanceOf(address(this)), initialBalance - joinAmount);
+        
+        this.exitAllCoin(address(coinJoin));
+        assertEq(safeEngine.coinBalance(address(proxy)), 0);
+        assertEq(coin.balanceOf(address(this)), initialBalance);
     }
 }
 
