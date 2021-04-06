@@ -28,6 +28,7 @@ abstract contract AccountingEngineLike {
     function surplusAuctionHouse() external virtual returns (address);
     function auctionDebt() external virtual returns (uint256);
     function auctionSurplus() external virtual returns (uint256);
+    function safeEngine() external virtual returns (SAFEEngineLike);
 }
 
 abstract contract DebtAuctionHouseLike {
@@ -86,8 +87,10 @@ contract GebProxyDebtAuctionActions is Common, AuctionCommon {
         // Starts auction
         uint auctionId = accountingEngine.auctionDebt();
         (uint bidAmount,,,,) = debtAuctionHouse.bids(auctionId);
-        // Joins system coins
-        coinJoin_join(coinJoin, address(this), toWad(bidAmount));
+        // Joins system coins (as needed)
+        uint currentBalance = safeEngine.coinBalance(address(this));
+        if (currentBalance < bidAmount)
+            coinJoin_join(coinJoin, address(this), toWad(bidAmount - currentBalance));
         // Allows auction house to access to proxy's COIN balance in the SAFEEngine
         if (safeEngine.canModifySAFE(address(this), address(debtAuctionHouse)) == 0) {
             safeEngine.approveSAFEModification(address(debtAuctionHouse));
@@ -106,8 +109,10 @@ contract GebProxyDebtAuctionActions is Common, AuctionCommon {
         SAFEEngineLike safeEngine = SAFEEngineLike(CoinJoinLike(coinJoin).safeEngine());
 
         (uint bidAmount,,, uint48 bidExpiry, uint48 auctionDeadline) = debtAuctionHouse.bids(auctionId);
-        // Joins system coins
-        coinJoin_join(coinJoin, address(this), toWad(bidAmount));
+        // Joins system coins (as needed)
+        uint currentBalance = safeEngine.coinBalance(address(this));
+        if (currentBalance < bidAmount)
+            coinJoin_join(coinJoin, address(this), toWad(bidAmount - currentBalance));
         // Allows auction house to access to proxy's COIN balance in the SAFEEngine
         if (safeEngine.canModifySAFE(address(this), address(debtAuctionHouse)) == 0) {
             safeEngine.approveSAFEModification(address(debtAuctionHouse));
