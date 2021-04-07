@@ -105,11 +105,57 @@ contract GebProxyDebtAuctionActionsTest is GebDeployTestBase, DebtProxyCalls {
         assertEq(amountToBuy, 8 ether);
     }
 
+    function testStartAndDecreaseSoldAmountWithPreviousBalance() public {
+        uint previousBalance = 1 ether;
+        coin.approve(address(coinJoin), previousBalance);
+        coinJoin.join(address(proxy), previousBalance);
+        assertEq(accountingEngine.safeEngine().coinBalance(address(proxy)), 1 ether * 10**27);
+
+        uint coinBalance = coin.balanceOf(address(this));
+        coin.approve(address(proxy), (debtAuctionBidSize / 10**27) - previousBalance); // approving 9 eth
+        this.startAndDecreaseSoldAmount(address(coinJoin), address(accountingEngine), 8 ether);
+
+        assertEq(accountingEngine.safeEngine().coinBalance(address(proxy)), 0);
+        assertEq(coin.balanceOf(address(this)), coinBalance - (debtAuctionBidSize / 10**27) + previousBalance);
+
+        (uint bidAmount, uint amountToBuy, address highBidder,,)
+            = debtAuctionHouse.bids(1);
+
+        assertEq(debtAuctionHouse.activeDebtAuctions(), 1);
+        assertEq(highBidder, address(proxy));
+        assertEq(bidAmount, debtAuctionBidSize);
+        assertEq(amountToBuy, 8 ether);
+    }
+
     function testDecreaseSoldAmountOngoingAuction() public {
         uint auctionId = accountingEngine.auctionDebt();
 
         coin.approve(address(proxy), debtAuctionBidSize);
         this.decreaseSoldAmount(address(coinJoin), address(debtAuctionHouse), auctionId, 8 ether);
+
+        (uint bidAmount, uint amountToBuy, address highBidder,,)
+            = debtAuctionHouse.bids(auctionId);
+
+        assertEq(debtAuctionHouse.activeDebtAuctions(), 1);
+        assertEq(highBidder, address(proxy));
+        assertEq(bidAmount, debtAuctionBidSize);
+        assertEq(amountToBuy, 8 ether);
+    }
+
+    function testDecreaseSoldAmountOngoingAuctionWithPreviousBalance() public {
+        uint auctionId = accountingEngine.auctionDebt();
+
+        uint previousBalance = 1 ether;
+        coin.approve(address(coinJoin), previousBalance);
+        coinJoin.join(address(proxy), previousBalance);
+        assertEq(accountingEngine.safeEngine().coinBalance(address(proxy)), 1 ether * 10**27);
+
+        uint coinBalance = coin.balanceOf(address(this));
+        coin.approve(address(proxy), (debtAuctionBidSize / 10**27) - previousBalance);
+        this.decreaseSoldAmount(address(coinJoin), address(debtAuctionHouse), auctionId, 8 ether);
+
+        assertEq(accountingEngine.safeEngine().coinBalance(address(proxy)), 0);
+        assertEq(coin.balanceOf(address(this)), coinBalance - (debtAuctionBidSize / 10**27) + previousBalance);
 
         (uint bidAmount, uint amountToBuy, address highBidder,,)
             = debtAuctionHouse.bids(auctionId);
