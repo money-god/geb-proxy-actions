@@ -26,6 +26,9 @@ abstract contract GebSaviourLike {
     function withdraw(bytes32, uint256, uint256, address) virtual external;
     function getReserves(uint256, address) virtual external;
 }
+abstract contract SaviourCRatioSetterLike {
+    function setDesiredCollateralizationRatio(bytes32, uint256, uint256) virtual external;
+}
 
 /// @title Saviour proxy actions
 /// @notice This contract is supposed to be used alongside a DSProxy contract.
@@ -44,7 +47,7 @@ contract GebProxySaviourActions {
         DSTokenLike(token).approve(target, amount);
     }
 
-    // --- External Logic
+    // --- External Logic ---
     /*
     * @notice Transfer all tokens that the proxy has out of an array of tokens to the caller
     * @param tokens The array of tokens being transfered
@@ -73,6 +76,21 @@ contract GebProxySaviourActions {
         ManagerLike(manager).protectSAFE(safe, liquidationEngine, saviour);
     }
     /*
+    * @notice Set a custom desired collateralization ratio for a specific SAFE
+    * @param cRatioSetter The address of the saviour cRatio setter
+    * @param collateralType The collateral type of the SAFE
+    * @param safe The ID of the SAFE
+    * @param cRatio The desired collateralization ratio for the SAFE
+    */
+    function setDesiredCollateralizationRatio(
+        address cRatioSetter,
+        bytes32 collateralType,
+        uint256 safe,
+        uint256 cRatio
+    ) public {
+        SaviourCRatioSetterLike(cRatioSetter).setDesiredCollateralizationRatio(collateralType, safe, cRatio);
+    }
+    /*
     * @notice Deposit cover in a saviour contract
     * @param collateralSpecific Whether the collateral type of the SAFE needs to be passed to the saviour contract
     * @param saviour The saviour contract being attached
@@ -98,6 +116,30 @@ contract GebProxySaviourActions {
         }
     }
     /*
+    * @notice Set a custom desired collateralization ratio for a specific SAFE and deposit cover in a saviour for the SAFE
+    * @param collateralSpecific Whether the collateral type of the SAFE needs to be passed to the saviour contract
+    * @param saviour The saviour contract being attached
+    * @param cRatioSetter The address of the saviour cRatio setter
+    * @param manager The SAFE manager contract
+    * @param token The token being used as cover
+    * @param safe The ID of the SAFE being covered
+    * @param tokenAmount The amount of tokens being deposited as cover
+    * @param cRatio The desired collateralization ratio for the SAFE
+    */
+    function setDesiredCRatioDeposit(
+        bool collateralSpecific,
+        address saviour,
+        address cRatioSetter,
+        address manager,
+        address token,
+        uint256 safe,
+        uint256 tokenAmount,
+        uint256 cRatio
+    ) public {
+        setDesiredCollateralizationRatio(cRatioSetter, ManagerLike(manager).collateralTypes(safe), safe, cRatio);
+        deposit(collateralSpecific, saviour, manager, token, safe, tokenAmount);
+    }
+    /*
     * @notice Withdraw cover from a saviour contract
     * @param collateralSpecific Whether the collateral type of the SAFE needs to be passed to the saviour contract
     * @param saviour The saviour contract from which to withdraw cover
@@ -121,6 +163,30 @@ contract GebProxySaviourActions {
         }
     }
     /*
+    * @notice Set a custom desired collateralization ratio for a specific SAFE and withdraw cover from a saviour protecting the SAFE
+    * @param collateralSpecific Whether the collateral type of the SAFE needs to be passed to the saviour contract
+    * @param saviour The saviour contract from which to withdraw cover
+    * @param cRatioSetter The address of the saviour cRatio setter
+    * @param manager The SAFE manager contract
+    * @param safe The ID of the SAFE being covered
+    * @param tokenAmount The amount of tokens being withdrawn
+    * @param cRatio The desired collateralization ratio for the SAFE
+    * @param dst The address that will receive the withdrawn tokens
+    */
+    function setDesiredCRatioWithdraw(
+        bool collateralSpecific,
+        address saviour,
+        address cRatioSetter,
+        address manager,
+        uint256 safe,
+        uint256 tokenAmount,
+        uint256 cRatio,
+        address dst
+    ) public {
+        setDesiredCollateralizationRatio(cRatioSetter, ManagerLike(manager).collateralTypes(safe), safe, cRatio);
+        withdraw(collateralSpecific, saviour, manager, safe, tokenAmount, dst);
+    }
+    /*
     * @notice Attach a saviour to a SAFE and deposit cover in it
     * @param collateralSpecific Whether the collateral type of the SAFE needs to be passed to the saviour contract
     * @param saviour The saviour contract being attached
@@ -140,6 +206,33 @@ contract GebProxySaviourActions {
         uint256 tokenAmount
     ) public {
         protectSAFE(saviour, manager, safe, liquidationEngine);
+        deposit(collateralSpecific, saviour, manager, token, safe, tokenAmount);
+    }
+    /*
+    * @notice Attach a saviour to a SAFE, set the SAFE's desired cRatio and deposit cover in the saviour
+    * @param collateralSpecific Whether the collateral type of the SAFE needs to be passed to the saviour contract
+    * @param saviour The saviour contract being attached
+    * @param cRatioSetter The cRatio setter contract
+    * @param manager The SAFE manager contract
+    * @param token The token being used as cover
+    * @param liquidationEngine The LiquidationEngine contract
+    * @param safe The ID of the SAFE being covered
+    * @param tokenAmount The amount of tokens being deposited as cover
+    * @param cRatio The desired collateralization ratio
+    */
+    function protectSAFESetDesiredCRatioDeposit(
+        bool collateralSpecific,
+        address saviour,
+        address cRatioSetter,
+        address manager,
+        address token,
+        address liquidationEngine,
+        uint256 safe,
+        uint256 tokenAmount,
+        uint256 cRatio
+    ) public {
+        protectSAFE(saviour, manager, safe, liquidationEngine);
+        setDesiredCollateralizationRatio(cRatioSetter, ManagerLike(manager).collateralTypes(safe), safe, cRatio);
         deposit(collateralSpecific, saviour, manager, token, safe, tokenAmount);
     }
     /*
@@ -188,7 +281,7 @@ contract GebProxySaviourActions {
         address manager,
         address depositToken,
         address liquidationEngine,
-        uint safe,
+        uint256 safe,
         uint256 withdrawTokenAmount,
         uint256 depositTokenAmount,
         address withdrawDst
