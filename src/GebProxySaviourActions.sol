@@ -31,7 +31,7 @@ abstract contract SaviourCRatioSetterLike {
 }
 
 /// @title Saviour proxy actions
-/// @notice This contract is supposed to be used alongside a DSProxy contract.
+/// @notice This contract is supposed to be used alongside a DSProxy contract
 /// @dev These functions are meant to be used as a a library for a DSProxy
 contract GebProxySaviourActions {
     // --- Internal Logic ---
@@ -246,7 +246,7 @@ contract GebProxySaviourActions {
     * @param tokenAmount The amount of tokens being withdrawn
     * @param dst The address that will receive the withdrawn tokens
     */
-    function withdrawProtectSAFE(
+    function withdrawUncoverSAFE(
         bool collateralSpecific,
         address saviour,
         address manager,

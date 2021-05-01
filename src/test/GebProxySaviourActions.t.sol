@@ -237,7 +237,7 @@ contract ProxyCalls {
         proxy.execute(gebProxySaviourActions, msg.data);
     }
 
-    function withdrawProtectSAFE(
+    function withdrawUncoverSAFE(
         bool,
         address,
         address,
@@ -549,6 +549,9 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
         pair.sync();
     }
 
+    // --- Uniswap Saviour Utils ---
+
+
     // --- Tests ---
     function test_setup() public {
         assertEq(compoundSaviour.authorizedAccounts(address(this)), 1);
@@ -625,8 +628,586 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
         this.setDesiredCollateralizationRatio(address(cRatioSetter), "eth", safe, 0);
         assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 0);
+    }
 
-        /* this.setDesiredCollateralizationRatio(address(cRatioSetter), "eth", safe, minDesiredCollateralizationRatio - 1);
-        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 0); */
+    function test_deposit_in_compound_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        systemCoin.approve(address(proxy), uint(-1));
+        uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
+
+        this.protectSAFE(address(compoundSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.deposit(true, address(compoundSaviour), address(safeManager), address(systemCoin), safe, systemCoinsToMint);
+
+        assertEq(systemCoin.balanceOf(address(this)) + systemCoinsToMint, systemCoinBalanceSelf);
+        assertEq(systemCoin.balanceOf(address(proxy)), 0);
+        assertEq(systemCoin.balanceOf(address(compoundSaviour)), 0);
+        assertTrue(cRAI.balanceOf(address(compoundSaviour)) > 0);
+        assertTrue(compoundSaviour.cTokenCover("eth", safeManager.safes(safe)) > 0);
+    }
+
+    function test_deposit_in_uniswap_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFE(address(uniswapSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.deposit(false, address(uniswapSaviour), address(safeManager), address(raiWETHPair), safe, lpTokenAmount);
+
+        assertEq(raiWETHPair.balanceOf(address(this)), 0);
+        assertEq(raiWETHPair.balanceOf(address(proxy)), 0);
+        assertEq(raiWETHPair.balanceOf(address(uniswapSaviour)), lpTokenAmount);
+        assertEq(uniswapSaviour.lpTokenCover(safeManager.safes(safe)), lpTokenAmount);
+    }
+
+    function testFail_deposit_in_uniswap_saviour_collateral_specific() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFE(address(uniswapSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.deposit(true, address(uniswapSaviour), address(safeManager), address(raiWETHPair), safe, lpTokenAmount);
+    }
+
+    function test_set_desired_cratio_deposit_in_compound_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        systemCoin.approve(address(proxy), uint(-1));
+        uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
+
+        // Protect, set the desired cRatio and deposit
+        this.protectSAFE(address(compoundSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.setDesiredCRatioDeposit(
+          true, address(compoundSaviour), address(cRatioSetter), address(safeManager), address(systemCoin), safe, systemCoinsToMint, 999
+        );
+
+        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 999);
+        assertEq(systemCoin.balanceOf(address(this)) + systemCoinsToMint, systemCoinBalanceSelf);
+        assertEq(systemCoin.balanceOf(address(proxy)), 0);
+        assertEq(systemCoin.balanceOf(address(compoundSaviour)), 0);
+        assertTrue(cRAI.balanceOf(address(compoundSaviour)) > 0);
+        assertTrue(compoundSaviour.cTokenCover("eth", safeManager.safes(safe)) > 0);
+    }
+
+    function test_set_desired_cratio_deposit_in_uniswap_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFE(address(uniswapSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.setDesiredCRatioDeposit(
+          false, address(uniswapSaviour), address(cRatioSetter), address(safeManager), address(raiWETHPair), safe, lpTokenAmount, 999
+        );
+
+        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 999);
+        assertEq(raiWETHPair.balanceOf(address(this)), 0);
+        assertEq(raiWETHPair.balanceOf(address(proxy)), 0);
+        assertEq(raiWETHPair.balanceOf(address(uniswapSaviour)), lpTokenAmount);
+        assertEq(uniswapSaviour.lpTokenCover(safeManager.safes(safe)), lpTokenAmount);
+    }
+
+    function test_withdraw_self_from_compound_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        systemCoin.approve(address(proxy), uint(-1));
+        uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
+
+        this.protectSAFE(address(compoundSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.deposit(true, address(compoundSaviour), address(safeManager), address(systemCoin), safe, systemCoinsToMint);
+        this.withdraw(
+          true, address(compoundSaviour), address(safeManager), safe, compoundSaviour.cTokenCover("eth", safeManager.safes(safe)), address(this)
+        );
+
+        assertEq(systemCoin.balanceOf(address(this)), systemCoinBalanceSelf);
+        assertEq(systemCoin.balanceOf(address(proxy)), 0);
+        assertEq(systemCoin.balanceOf(address(compoundSaviour)), 0);
+        assertEq(cRAI.balanceOf(address(compoundSaviour)), 0);
+        assertEq(cRAI.totalSupply(), 0);
+        assertEq(compoundSaviour.cTokenCover("eth", safeManager.safes(safe)), 0);
+    }
+
+    function test_withdraw_other_from_compound_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        systemCoin.approve(address(proxy), uint(-1));
+
+        this.protectSAFE(address(compoundSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.deposit(true, address(compoundSaviour), address(safeManager), address(systemCoin), safe, systemCoinsToMint);
+        this.withdraw(
+          true, address(compoundSaviour), address(safeManager), safe, compoundSaviour.cTokenCover("eth", safeManager.safes(safe)), address(0x1234)
+        );
+
+        assertEq(systemCoin.balanceOf(address(0x1234)), systemCoinsToMint);
+        assertEq(systemCoin.balanceOf(address(proxy)), 0);
+        assertEq(systemCoin.balanceOf(address(compoundSaviour)), 0);
+        assertEq(cRAI.balanceOf(address(compoundSaviour)), 0);
+        assertEq(cRAI.totalSupply(), 0);
+        assertEq(compoundSaviour.cTokenCover("eth", safeManager.safes(safe)), 0);
+    }
+
+    function test_withdraw_self_from_uniswap_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFE(address(uniswapSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.deposit(false, address(uniswapSaviour), address(safeManager), address(raiWETHPair), safe, lpTokenAmount);
+        this.withdraw(false, address(uniswapSaviour), address(safeManager), safe, lpTokenAmount, address(this));
+
+        // Checks
+        assertEq(raiWETHPair.balanceOf(address(this)), lpTokenAmount);
+        assertEq(raiWETHPair.balanceOf(address(proxy)), 0);
+        assertEq(raiWETHPair.balanceOf(address(uniswapSaviour)), 0);
+        assertEq(uniswapSaviour.lpTokenCover(safeManager.safes(safe)), 0);
+    }
+
+    function test_withdraw_other_from_uniswap_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFE(address(uniswapSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.deposit(false, address(uniswapSaviour), address(safeManager), address(raiWETHPair), safe, lpTokenAmount);
+        this.withdraw(false, address(uniswapSaviour), address(safeManager), safe, lpTokenAmount, address(0x1234));
+
+        // Checks
+        assertEq(raiWETHPair.balanceOf(address(this)), 0);
+        assertEq(raiWETHPair.balanceOf(address(0x1234)), lpTokenAmount);
+        assertEq(raiWETHPair.balanceOf(address(proxy)), 0);
+        assertEq(raiWETHPair.balanceOf(address(uniswapSaviour)), 0);
+        assertEq(uniswapSaviour.lpTokenCover(safeManager.safes(safe)), 0);
+    }
+
+    function test_set_desired_cratio_withdraw_from_compound_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        systemCoin.approve(address(proxy), uint(-1));
+        uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
+
+        this.protectSAFE(address(compoundSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.deposit(true, address(compoundSaviour), address(safeManager), address(systemCoin), safe, systemCoinsToMint);
+        this.setDesiredCRatioWithdraw(
+          true, address(compoundSaviour), address(cRatioSetter), address(safeManager),
+          safe, compoundSaviour.cTokenCover("eth", safeManager.safes(safe)), 950, address(this)
+        );
+
+        // Checks
+        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 950);
+        assertEq(systemCoin.balanceOf(address(this)), systemCoinBalanceSelf);
+        assertEq(systemCoin.balanceOf(address(proxy)), 0);
+        assertEq(systemCoin.balanceOf(address(compoundSaviour)), 0);
+        assertEq(cRAI.balanceOf(address(compoundSaviour)), 0);
+        assertEq(cRAI.totalSupply(), 0);
+        assertEq(compoundSaviour.cTokenCover("eth", safeManager.safes(safe)), 0);
+    }
+
+    function test_set_desired_cratio_withdraw_from_uniswap_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFE(address(uniswapSaviour), address(safeManager), safe, address(liquidationEngine));
+        this.deposit(false, address(uniswapSaviour), address(safeManager), address(raiWETHPair), safe, lpTokenAmount);
+        this.setDesiredCRatioWithdraw(
+          false, address(uniswapSaviour), address(cRatioSetter), address(safeManager), safe, lpTokenAmount, 950, address(this)
+        );
+
+        // Checks
+        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 950);
+        assertEq(raiWETHPair.balanceOf(address(this)), lpTokenAmount);
+        assertEq(raiWETHPair.balanceOf(address(proxy)), 0);
+        assertEq(raiWETHPair.balanceOf(address(uniswapSaviour)), 0);
+        assertEq(uniswapSaviour.lpTokenCover(safeManager.safes(safe)), 0);
+    }
+
+    function test_protect_safe_deposit_compound_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        systemCoin.approve(address(proxy), uint(-1));
+        uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
+
+        // Protect and deposit
+        this.protectSAFEDeposit(
+          true, address(compoundSaviour), address(safeManager), address(systemCoin), address(liquidationEngine), safe, systemCoinsToMint
+        );
+
+        // Checks
+        assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(compoundSaviour));
+        assertEq(systemCoin.balanceOf(address(this)) + systemCoinsToMint, systemCoinBalanceSelf);
+        assertEq(systemCoin.balanceOf(address(proxy)), 0);
+        assertEq(systemCoin.balanceOf(address(compoundSaviour)), 0);
+        assertTrue(cRAI.balanceOf(address(compoundSaviour)) > 0);
+        assertTrue(compoundSaviour.cTokenCover("eth", safeManager.safes(safe)) > 0);
+    }
+
+    function test_protect_safe_deposit_uniswap_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFEDeposit(
+          false, address(uniswapSaviour), address(safeManager), address(raiWETHPair), address(liquidationEngine), safe, lpTokenAmount
+        );
+
+        // Checks
+        assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(uniswapSaviour));
+        assertEq(raiWETHPair.balanceOf(address(this)), 0);
+        assertEq(raiWETHPair.balanceOf(address(proxy)), 0);
+        assertEq(raiWETHPair.balanceOf(address(uniswapSaviour)), lpTokenAmount);
+        assertEq(uniswapSaviour.lpTokenCover(safeManager.safes(safe)), lpTokenAmount);
+    }
+
+    function test_protect_safe_set_desired_cratio_deposit_compound_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        systemCoin.approve(address(proxy), uint(-1));
+        uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
+
+        // Protect and deposit
+        this.protectSAFESetDesiredCRatioDeposit(
+          true, address(compoundSaviour), address(cRatioSetter), address(safeManager),
+          address(systemCoin), address(liquidationEngine), safe, systemCoinsToMint, 900
+        );
+
+        // Checks
+        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 900);
+        assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(compoundSaviour));
+        assertEq(systemCoin.balanceOf(address(this)) + systemCoinsToMint, systemCoinBalanceSelf);
+        assertEq(systemCoin.balanceOf(address(proxy)), 0);
+        assertEq(systemCoin.balanceOf(address(compoundSaviour)), 0);
+        assertTrue(cRAI.balanceOf(address(compoundSaviour)) > 0);
+        assertTrue(compoundSaviour.cTokenCover("eth", safeManager.safes(safe)) > 0);
+    }
+
+    function test_protect_safe_set_desired_cratio_deposit_uniswap_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFESetDesiredCRatioDeposit(
+          false, address(uniswapSaviour), address(cRatioSetter), address(safeManager),
+          address(raiWETHPair), address(liquidationEngine), safe, lpTokenAmount, 900
+        );
+
+        // Checks
+        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 900);
+        assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(uniswapSaviour));
+        assertEq(raiWETHPair.balanceOf(address(this)), 0);
+        assertEq(raiWETHPair.balanceOf(address(proxy)), 0);
+        assertEq(raiWETHPair.balanceOf(address(uniswapSaviour)), lpTokenAmount);
+        assertEq(uniswapSaviour.lpTokenCover(safeManager.safes(safe)), lpTokenAmount);
+    }
+
+    function test_withdraw_uncover_compound_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        systemCoin.approve(address(proxy), uint(-1));
+        uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
+
+        // Protect and deposit and then withdraw and uncover
+        this.protectSAFESetDesiredCRatioDeposit(
+          true, address(compoundSaviour), address(cRatioSetter), address(safeManager),
+          address(systemCoin), address(liquidationEngine), safe, systemCoinsToMint, 900
+        );
+        this.withdrawUncoverSAFE(
+          true, address(compoundSaviour), address(safeManager), address(systemCoin), address(liquidationEngine),
+          safe, systemCoinsToMint, address(this)
+        );
+
+        // Checks
+        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 900);
+        assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(0));
+        assertEq(systemCoin.balanceOf(address(this)), systemCoinBalanceSelf);
+        assertEq(systemCoin.balanceOf(address(proxy)), 0);
+        assertEq(systemCoin.balanceOf(address(compoundSaviour)), 0);
+        assertEq(cRAI.balanceOf(address(compoundSaviour)), 0);
+        assertEq(compoundSaviour.cTokenCover("eth", safeManager.safes(safe)), 0);
+    }
+
+    function test_withdraw_uncover_uniswap_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFESetDesiredCRatioDeposit(
+          false, address(uniswapSaviour), address(cRatioSetter), address(safeManager),
+          address(raiWETHPair), address(liquidationEngine), safe, lpTokenAmount, 900
+        );
+        this.withdrawUncoverSAFE(
+          false, address(uniswapSaviour), address(safeManager), address(raiWETHPair), address(liquidationEngine),
+          safe, lpTokenAmount, address(this)
+        );
+
+        // Checks
+        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 900);
+        assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(0));
+        assertEq(raiWETHPair.balanceOf(address(this)), lpTokenAmount);
+        assertEq(raiWETHPair.balanceOf(address(proxy)), 0);
+        assertEq(raiWETHPair.balanceOf(address(uniswapSaviour)), 0);
+        assertEq(uniswapSaviour.lpTokenCover(safeManager.safes(safe)), 0);
+    }
+
+    function test_withdraw_from_compound_saviour_protect_deposit_in_uniswap_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        systemCoin.approve(address(proxy), uint(-1));
+        uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
+
+        // Protect and deposit
+        this.protectSAFESetDesiredCRatioDeposit(
+          true, address(compoundSaviour), address(cRatioSetter), address(safeManager),
+          address(systemCoin), address(liquidationEngine), safe, systemCoinsToMint, 900
+        );
+
+        // Add liquidity to Uniswap
+        systemCoin.mint(address(this), initRAIETHPairLiquidity);
+
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Change cover to the Uniswap saviour
+        this.withdrawProtectSAFEDeposit(
+          true, false, address(compoundSaviour), address(uniswapSaviour), address(safeManager),
+          address(raiWETHPair), address(liquidationEngine), safe, systemCoinsToMint, lpTokenAmount,
+          address(this)
+        );
+
+        // Checks
+        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 900);
+        assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(uniswapSaviour));
+
+        assertEq(systemCoin.balanceOf(address(this)), systemCoinBalanceSelf);
+        assertEq(systemCoin.balanceOf(address(proxy)), 0);
+        assertEq(systemCoin.balanceOf(address(compoundSaviour)), 0);
+        assertEq(cRAI.balanceOf(address(compoundSaviour)), 0);
+        assertEq(compoundSaviour.cTokenCover("eth", safeManager.safes(safe)), 0);
+
+        assertEq(raiWETHPair.balanceOf(address(this)), 0);
+        assertEq(raiWETHPair.balanceOf(address(proxy)), 0);
+        assertEq(raiWETHPair.balanceOf(address(uniswapSaviour)), lpTokenAmount);
+        assertEq(uniswapSaviour.lpTokenCover(safeManager.safes(safe)), lpTokenAmount);
+    }
+
+    function test_withdraw_from_uniswap_saviour_protect_deposit_in_compound_saviour() public {
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        systemCoin.approve(address(proxy), uint(-1));
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFESetDesiredCRatioDeposit(
+          false, address(uniswapSaviour), address(cRatioSetter), address(safeManager),
+          address(raiWETHPair), address(liquidationEngine), safe, lpTokenAmount, 900
+        );
+
+        // Change cover to the Compound saviour
+        systemCoin.mint(address(this), systemCoinsToMint);
+        uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
+
+        this.withdrawProtectSAFEDeposit(
+          false, true, address(uniswapSaviour), address(compoundSaviour), address(safeManager),
+          address(systemCoin), address(liquidationEngine), safe, lpTokenAmount, systemCoinsToMint,
+          address(this)
+        );
+
+        // Checks
+        assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 900);
+        assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(compoundSaviour));
+
+        assertEq(systemCoin.balanceOf(address(this)) + systemCoinsToMint, systemCoinBalanceSelf);
+        assertEq(systemCoin.balanceOf(address(proxy)), 0);
+        assertEq(systemCoin.balanceOf(address(compoundSaviour)), 0);
+        assertTrue(cRAI.balanceOf(address(compoundSaviour)) > 0);
+        assertTrue(compoundSaviour.cTokenCover("eth", safeManager.safes(safe)) > 0);
+
+        assertEq(raiWETHPair.balanceOf(address(this)), lpTokenAmount);
+        assertEq(raiWETHPair.balanceOf(address(proxy)), 0);
+        assertEq(raiWETHPair.balanceOf(address(uniswapSaviour)), 0);
+        assertEq(uniswapSaviour.lpTokenCover(safeManager.safes(safe)), 0);
+    }
+
+    function test_get_reserves_self_uniswap_saviour() public {
+        uniswapSaviour.modifyParameters("minKeeperPayoutValue", 1 ether);
+
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFESetDesiredCRatioDeposit(
+          false, address(uniswapSaviour), address(cRatioSetter), address(safeManager),
+          address(raiWETHPair), address(liquidationEngine), safe, lpTokenAmount, minDesiredCollateralizationRatio
+        );
+
+        // Save
+        ethMedian.updateCollateralPrice(initETHUSDPrice / 30);
+        ethFSM.updateCollateralPrice(initETHUSDPrice / 30);
+        oracleRelayer.updateCollateralPrice("eth");
+
+        liquidationEngine.modifyParameters("eth", "liquidationQuantity", rad(100000 ether));
+        liquidationEngine.modifyParameters("eth", "liquidationPenalty", 1.1 ether);
+
+        uint256 preSaveSysCoinKeeperBalance = systemCoin.balanceOf(address(this));
+        uint256 preSaveWETHKeeperBalance = weth.balanceOf(address(this));
+
+        uint auction = liquidationEngine.liquidateSAFE("eth", safeManager.safes(safe));
+        (uint256 sysCoinReserve, uint256 collateralReserve) = uniswapSaviour.underlyingReserves(safeManager.safes(safe));
+
+        assertEq(auction, 0);
+        assertTrue(
+          sysCoinReserve > 0 ||
+          collateralReserve > 0
+        );
+        assertTrue(
+          systemCoin.balanceOf(address(this)) - preSaveSysCoinKeeperBalance > 0 ||
+          weth.balanceOf(address(this)) - preSaveWETHKeeperBalance > 0
+        );
+        assertTrue(raiWETHPair.balanceOf(address(uniswapSaviour)) < lpTokenAmount);
+
+        // Get reserves
+        uint256 sysCoinSelfBalance    = systemCoin.balanceOf(address(this));
+        uint256 collateralSelfBalance = weth.balanceOf(address(this));
+
+        this.getReserves(address(uniswapSaviour), safe, address(this));
+        assertEq(systemCoin.balanceOf(address(this)), sysCoinSelfBalance + sysCoinReserve);
+        assertEq(weth.balanceOf(address(this)), collateralSelfBalance + collateralReserve);
+    }
+
+    function test_get_reserves_other_uniswap_saviour() public {
+        uniswapSaviour.modifyParameters("minKeeperPayoutValue", 1 ether);
+
+        uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
+          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+
+        // Add liquidity to Uniswap
+        addPairLiquidityRouter(
+          address(systemCoin), address(weth), initRAIETHPairLiquidity, initETHRAIPairLiquidity
+        );
+        uint256 lpTokenAmount = raiWETHPair.balanceOf(address(this));
+        raiWETHPair.approve(address(proxy), uint(-1));
+
+        // Protect and deposit
+        this.protectSAFESetDesiredCRatioDeposit(
+          false, address(uniswapSaviour), address(cRatioSetter), address(safeManager),
+          address(raiWETHPair), address(liquidationEngine), safe, lpTokenAmount, minDesiredCollateralizationRatio
+        );
+
+        // Save
+        ethMedian.updateCollateralPrice(initETHUSDPrice / 30);
+        ethFSM.updateCollateralPrice(initETHUSDPrice / 30);
+        oracleRelayer.updateCollateralPrice("eth");
+
+        liquidationEngine.modifyParameters("eth", "liquidationQuantity", rad(100000 ether));
+        liquidationEngine.modifyParameters("eth", "liquidationPenalty", 1.1 ether);
+
+        uint256 preSaveSysCoinKeeperBalance = systemCoin.balanceOf(address(this));
+        uint256 preSaveWETHKeeperBalance = weth.balanceOf(address(this));
+
+        uint auction = liquidationEngine.liquidateSAFE("eth", safeManager.safes(safe));
+        (uint256 sysCoinReserve, uint256 collateralReserve) = uniswapSaviour.underlyingReserves(safeManager.safes(safe));
+
+        assertEq(auction, 0);
+        assertTrue(
+          sysCoinReserve > 0 ||
+          collateralReserve > 0
+        );
+        assertTrue(
+          systemCoin.balanceOf(address(this)) - preSaveSysCoinKeeperBalance > 0 ||
+          weth.balanceOf(address(this)) - preSaveWETHKeeperBalance > 0
+        );
+        assertTrue(raiWETHPair.balanceOf(address(uniswapSaviour)) < lpTokenAmount);
+
+        // Get reserves
+        this.getReserves(address(uniswapSaviour), safe, address(0x123));
+        assertEq(systemCoin.balanceOf(address(0x123)), sysCoinReserve);
+        assertEq(weth.balanceOf(address(0x123)), collateralReserve);
     }
 }
