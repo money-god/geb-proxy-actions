@@ -266,7 +266,7 @@ contract ProxyCalls {
         proxy.execute(gebProxySaviourActions, msg.data);
     }
 
-    function getReserves(address, uint256, address) public {
+    function getReservesAndUncover(address, address, address, uint256, address) public {
         proxy.execute(gebProxySaviourActions, msg.data);
     }
 }
@@ -1156,7 +1156,9 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
         uint256 sysCoinSelfBalance    = systemCoin.balanceOf(address(this));
         uint256 collateralSelfBalance = weth.balanceOf(address(this));
 
-        this.getReserves(address(uniswapSaviour), safe, address(this));
+        this.getReservesAndUncover(address(uniswapSaviour), address(safeManager), address(liquidationEngine), safe, address(this));
+
+        assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(0));
         assertEq(systemCoin.balanceOf(address(this)), sysCoinSelfBalance + sysCoinReserve);
         assertEq(weth.balanceOf(address(this)), collateralSelfBalance + collateralReserve);
     }
@@ -1206,7 +1208,9 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
         assertTrue(raiWETHPair.balanceOf(address(uniswapSaviour)) < lpTokenAmount);
 
         // Get reserves
-        this.getReserves(address(uniswapSaviour), safe, address(0x123));
+        this.getReservesAndUncover(address(uniswapSaviour), address(safeManager), address(liquidationEngine), safe, address(0x123));
+
+        assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(0));
         assertEq(systemCoin.balanceOf(address(0x123)), sysCoinReserve);
         assertEq(weth.balanceOf(address(0x123)), collateralReserve);
     }

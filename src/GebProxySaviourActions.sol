@@ -291,12 +291,24 @@ contract GebProxySaviourActions {
         deposit(depositCollateralSpecific, depositSaviour, manager, depositToken, safe, depositTokenAmount);
     }
     /*
-    * @notice Withdraw reserve tokens from a saviour
+    * @notice Withdraw reserve tokens from a saviour without uncovering a SAFE
     * @param saviour The saviour from which to withdraw reserve assets
     * @param safe The ID of the SAFE that has tokens in reserves
     * @param The address that will receive the reserve tokens
     */
     function getReserves(address saviour, uint256 safe, address dst) public {
         GebSaviourLike(saviour).getReserves(safe, dst);
+    }
+    /*
+    * @notice Withdraw reserve tokens from a saviour and uncover a SAFE
+    * @param saviour The saviour from which to withdraw reserve assets
+    * @param manager The SAFE manager contract
+    * @param liquidationEngine The LiquidationEngine contract
+    * @param safe The ID of the SAFE that has tokens in reserves
+    * @param The address that will receive the reserve tokens
+    */
+    function getReservesAndUncover(address saviour, address manager, address liquidationEngine, uint256 safe, address dst) public {
+        GebSaviourLike(saviour).getReserves(safe, dst);
+        protectSAFE(address(0), manager, safe, liquidationEngine);
     }
 }
