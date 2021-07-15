@@ -40,11 +40,18 @@ abstract contract DebtAuctionHouseLike {
 }
 
 abstract contract SurplusAuctionHouseLike {
+    function auctionsStarted() external virtual view returns (uint256);
     function bids(uint) external virtual returns (uint, uint, address, uint48, uint48);
     function increaseBidSize(uint256 id, uint256 amountToBuy, uint256 bid) external virtual;
     function restartAuction(uint256) external virtual;
     function settleAuction(uint256) external virtual;
     function protocolToken() external virtual returns (address);
+    function stakedToken() external virtual returns (address);
+}
+
+abstract contract GebStakingPool {
+    function auctionAncestorTokens() virtual external;
+    function auctionHouse() external virtual view returns (address);
 }
 
 contract AuctionCommon {
@@ -209,5 +216,73 @@ contract GebProxySurplusAuctionActions is Common, AuctionCommon {
         // Sends system coins and protocol tokens to the owner
         CoinJoinLike(coinJoin).exit(msg.sender, toWad(amountToBuy));
         claimProxyFunds(surplusAuctionHouse.protocolToken());
+    }
+}
+
+contract GebProxyStakedTokenAuctionActions is Common, AuctionCommon {
+
+    /// @notice Starts a staked token auction and bids
+    /// @param coinJoin Coin join contract
+    /// @param stakingPool Staking pool that triggers auctions
+    /// @param bidSize Bid size
+    function startAndIncreaseBidSize(address coinJoin, address stakingPool, uint bidSize) public {
+        GebStakingPool pool = GebStakingPool(stakingPool);
+        SurplusAuctionHouseLike auctionHouse = SurplusAuctionHouseLike(pool.auctionHouse());
+        SAFEEngineLike safeEngine = SAFEEngineLike(CoinJoinLike(coinJoin).safeEngine());
+
+        // Starts auction
+        pool.auctionAncestorTokens();
+        uint auctionId = auctionHouse.auctionsStarted();
+        (uint bidAmount, uint256 amountToSell,,,) = auctionHouse.bids(auctionId);
+        // Joins system coins (as needed)
+        uint currentBalance = safeEngine.coinBalance(address(this));
+        if (currentBalance < bidAmount)
+            coinJoin_join(coinJoin, address(this), toWad(bidAmount - currentBalance));
+        // Allows auction house to access to proxy's COIN balance in the SAFEEngine
+        if (safeEngine.canModifySAFE(address(this), address(auctionHouse)) == 0) {
+            safeEngine.approveSAFEModification(address(auctionHouse));
+        }
+        // Bid
+        auctionHouse.increaseBidSize(auctionId, amountToSell, bidAmount);
+    }
+
+    /// @notice Bids in auction. Restarts the auction if necessary
+    /// @param coinJoin Coin join contract
+    /// @param auctionHouse_ Auction house address
+    /// @param auctionId Auction ID
+    /// @param bidSize Bid size
+    function increaseBidSize(address coinJoin, address auctionHouse_, uint auctionId, uint bidSize) public {
+        SurplusAuctionHouseLike auctionHouse = SurplusAuctionHouseLike(auctionHouse_);
+        SAFEEngineLike safeEngine = SAFEEngineLike(CoinJoinLike(coinJoin).safeEngine());
+
+        (, uint amountToSell,, uint48 bidExpiry, uint48 auctionDeadline) = auctionHouse.bids(auctionId);
+        // Joins system coins (as needed)
+        uint currentBalance = safeEngine.coinBalance(address(this));
+        if (currentBalance < bidSize)
+            coinJoin_join(coinJoin, address(this), toWad(bidSize - currentBalance));
+        // Allows auction house to access to proxy's COIN balance in the SAFEEngine
+        if (safeEngine.canModifySAFE(address(this), address(auctionHouse)) == 0) {
+            safeEngine.approveSAFEModification(address(auctionHouse));
+        }
+        // Restarts auction if inactive
+        if (both(auctionDeadline < now, bidExpiry == 0)) {
+            auctionHouse.restartAuction(auctionId);
+        }
+        // Bid
+        auctionHouse.increaseBidSize(auctionId, amountToSell, bidSize);
+    }
+
+    /// @notice Settle an auction and receive the staked tokens
+    /// @param auctionHouse_ Auction house address
+    /// @param auctionId Auction ID
+    function settleAuction(address auctionHouse_, uint auctionId) public {
+        SurplusAuctionHouseLike auctionHouse = SurplusAuctionHouseLike(auctionHouse_);
+        DSTokenLike stakedToken = DSTokenLike(auctionHouse.stakedToken());
+
+        // Settle auction
+        auctionHouse.settleAuction(auctionId);
+
+        // Sends the staked tokens to the msg.sender
+        stakedToken.transfer(msg.sender, stakedToken.balanceOf(address(this)));
     }
 }
