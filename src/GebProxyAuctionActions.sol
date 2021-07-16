@@ -233,17 +233,17 @@ contract GebProxyStakedTokenAuctionActions is Common, AuctionCommon {
         // Starts auction
         pool.auctionAncestorTokens();
         uint auctionId = auctionHouse.auctionsStarted();
-        (uint bidAmount, uint256 amountToSell,,,) = auctionHouse.bids(auctionId);
+        (,uint256 amountToSell,,,) = auctionHouse.bids(auctionId);
         // Joins system coins (as needed)
         uint currentBalance = safeEngine.coinBalance(address(this));
-        if (currentBalance < bidAmount)
-            coinJoin_join(coinJoin, address(this), toWad(bidAmount - currentBalance));
+        if (currentBalance < bidSize)
+            coinJoin_join(coinJoin, address(this), toWad(bidSize - currentBalance));
         // Allows auction house to access to proxy's COIN balance in the SAFEEngine
         if (safeEngine.canModifySAFE(address(this), address(auctionHouse)) == 0) {
             safeEngine.approveSAFEModification(address(auctionHouse));
         }
         // Bid
-        auctionHouse.increaseBidSize(auctionId, amountToSell, bidAmount);
+        auctionHouse.increaseBidSize(auctionId, amountToSell, bidSize);
     }
 
     /// @notice Bids in auction. Restarts the auction if necessary
