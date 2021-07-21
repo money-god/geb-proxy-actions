@@ -30,7 +30,7 @@ import "geb-safe-saviours/integrations/uniswap/liquidity-managers/UniswapV3Liqui
 import {SaviourCRatioSetter} from "geb-safe-saviours/SaviourCRatioSetter.sol";
 import {SAFESaviourRegistry} from "geb-safe-saviours/SAFESaviourRegistry.sol";
 
-import {NativeUnderlyingUniswapSafeSaviour} from "geb-safe-saviours/saviours/NativeUnderlyingUniswapSafeSaviour.sol";
+import {NativeUnderlyingUniswapV2SafeSaviour} from "geb-safe-saviours/saviours/NativeUnderlyingUniswapV2SafeSaviour.sol";
 
 import {CompoundSystemCoinSafeSaviour} from "geb-safe-saviours/saviours/CompoundSystemCoinSafeSaviour.sol";
 
@@ -303,7 +303,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
     Coin systemCoin;
 
     CompoundSystemCoinSafeSaviour compoundSaviour;
-    NativeUnderlyingUniswapSafeSaviour uniswapSaviour;
+    NativeUnderlyingUniswapV2SafeSaviour uniswapSaviour;
 
     SaviourCRatioSetter cRatioSetter;
     SAFESaviourRegistry saviourRegistry;
@@ -491,7 +491,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
         saviourRegistry.toggleSaviour(address(compoundSaviour));
         liquidationEngine.connectSAFESaviour(address(compoundSaviour));
 
-        uniswapSaviour = new NativeUnderlyingUniswapSafeSaviour(
+        uniswapSaviour = new NativeUnderlyingUniswapV2SafeSaviour(
             isSystemCoinToken0,
             address(coinJoin),
             address(collateralJoin),

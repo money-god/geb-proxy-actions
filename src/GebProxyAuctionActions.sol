@@ -125,7 +125,7 @@ contract GebProxyDebtAuctionActions is Common, AuctionCommon {
             safeEngine.approveSAFEModification(address(debtAuctionHouse));
         }
         // Restarts auction if inactive
-        if (both(auctionDeadline < now, bidExpiry == 0)) {
+        if (both(both(auctionDeadline < now, bidExpiry == 0), auctionDeadline > 0)) {
             debtAuctionHouse.restartAuction(auctionId);
         }
         // Bid
@@ -192,7 +192,7 @@ contract GebProxySurplusAuctionActions is Common, AuctionCommon {
         protocolToken.approve(address(surplusAuctionHouse), bidSize);
         // Restarts auction if inactive
         (, uint amountToSell,, uint48 bidExpiry, uint48 auctionDeadline) = surplusAuctionHouse.bids(auctionId);
-        if (auctionDeadline < now && bidExpiry == 0) {
+        if (auctionDeadline < now && bidExpiry == 0 && auctionDeadline > 0) {
             surplusAuctionHouse.restartAuction(auctionId);
         }
         // Bid
@@ -265,7 +265,7 @@ contract GebProxyStakedTokenAuctionActions is Common, AuctionCommon {
             safeEngine.approveSAFEModification(address(auctionHouse));
         }
         // Restarts auction if inactive
-        if (both(auctionDeadline < now, bidExpiry == 0)) {
+        if (both(both(auctionDeadline < now, bidExpiry == 0), auctionDeadline > 0)) {
             auctionHouse.restartAuction(auctionId);
         }
         // Bid
