@@ -285,7 +285,7 @@ contract GebProxyLeverageActions is BasicActions {
             address coinJoin
         ) = abi.decode(data, (address, address, uint, address, address));
         _lockETH(manager, ethJoin, safe, collateralAmount);
-        _generateDebt(manager, taxCollector, coinJoin, safe, amountToRepay, address(this));
+        _generateDebt(manager, coinJoin, safe, amountToRepay, address(this));
     }
 
     /// @notice Will repay all debt and free ETH (sends it to msg.sender)

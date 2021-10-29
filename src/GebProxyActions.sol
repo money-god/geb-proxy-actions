@@ -190,19 +190,18 @@ contract BasicActions is Common {
 
     /// @notice Gets delta debt generated (Total Safe debt minus available safeHandler COIN balance)
     /// @param safeEngine address
-    /// @param taxCollector address
     /// @param safeHandler address
     /// @param collateralType bytes32
     /// @return deltaDebt
     function _getGeneratedDeltaDebt(
         address safeEngine,
-        address taxCollector,
         address safeHandler,
         bytes32 collateralType,
         uint wad
     ) internal returns (int deltaDebt) {
         // Updates stability fee rate
-        uint rate = TaxCollectorLike(taxCollector).taxSingle(collateralType);
+        // uint rate = TaxCollectorLike(taxCollector).taxSingle(collateralType);
+        (, uint rate,,,) = SAFEEngineLike(safeEngine).collateralTypes(collateralType);
         require(rate > 0, "invalid-collateral-type");
 
         // Gets COIN balance of the handler in the safeEngine
@@ -270,17 +269,16 @@ contract BasicActions is Common {
 
     /// @notice Generates Debt (and sends coin balance to address to)
     /// @param manager address
-    /// @param taxCollector address
     /// @param coinJoin address
     /// @param safe uint
     /// @param wad uint - amount of debt to be generated
     /// @param to address - receiver of the balance of generated COIN
-    function _generateDebt(address manager, address taxCollector, address coinJoin, uint safe, uint wad, address to) internal {
+    function _generateDebt(address manager, address coinJoin, uint safe, uint wad, address to) internal {
         address safeHandler = ManagerLike(manager).safes(safe);
         address safeEngine = ManagerLike(manager).safeEngine();
         bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
         // Generates debt in the SAFE
-        modifySAFECollateralization(manager, safe, 0, _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, wad));
+        modifySAFECollateralization(manager, safe, 0, _getGeneratedDeltaDebt(safeEngine, safeHandler, collateralType, wad));
         // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
         transferInternalCoins(manager, safe, address(this), toRad(wad));
         // Allows adapter to access to proxy's COIN balance in the safeEngine
@@ -657,18 +655,17 @@ contract BasicActions is Common {
 
     /// @notice Generates debt and sends COIN amount to msg.sender
     /// @param manager address
-    /// @param taxCollector address
     /// @param coinJoin address
     /// @param safe uint - Safe Id
     /// @param wad uint - Amount
     function generateDebt(
         address manager,
-        address taxCollector,
+        address /* taxCollector */,
         address coinJoin,
         uint safe,
         uint wad
     ) public {
-        _generateDebt(manager, taxCollector, coinJoin, safe, wad, msg.sender);
+        _generateDebt(manager, coinJoin, safe, wad, msg.sender);
     }
 
     /// @notice Repays debt
@@ -687,14 +684,13 @@ contract BasicActions is Common {
 
     /// @notice Locks Eth, generates debt and sends COIN amount (deltaWad) to msg.sender
     /// @param manager address
-    /// @param taxCollector address
     /// @param ethJoin address
     /// @param coinJoin address
     /// @param safe uint - Safe Id
     /// @param deltaWad uint - Amount
     function lockETHAndGenerateDebt(
         address manager,
-        address taxCollector,
+        address /* taxCollector */,
         address ethJoin,
         address coinJoin,
         uint safe,
@@ -706,7 +702,7 @@ contract BasicActions is Common {
         // Receives ETH amount, converts it to WETH and joins it into the safeEngine
         ethJoin_join(ethJoin, safeHandler, msg.value);
         // Locks WETH amount into the SAFE and generates debt
-        modifySAFECollateralization(manager, safe, toInt(msg.value), _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, deltaWad));
+        modifySAFECollateralization(manager, safe, toInt(msg.value), _getGeneratedDeltaDebt(safeEngine, safeHandler, collateralType, deltaWad));
         // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
         transferInternalCoins(manager, safe, address(this), toRad(deltaWad));
         // Allows adapter to access to proxy's COIN balance in the safeEngine
@@ -937,7 +933,7 @@ contract GebProxyActions is BasicActions {
 
     function lockTokenCollateralAndGenerateDebt(
         address manager,
-        address taxCollector,
+        address /* taxCollector */,
         address collateralJoin,
         address coinJoin,
         uint safe,
@@ -951,7 +947,7 @@ contract GebProxyActions is BasicActions {
         // Takes token amount from user's wallet and joins into the safeEngine
         tokenCollateralJoin_join(collateralJoin, safeHandler, collateralAmount, transferFrom);
         // Locks token amount into the SAFE and generates debt
-        modifySAFECollateralization(manager, safe, toInt(convertTo18(collateralJoin, collateralAmount)), _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, deltaWad));
+        modifySAFECollateralization(manager, safe, toInt(convertTo18(collateralJoin, collateralAmount)), _getGeneratedDeltaDebt(safeEngine, safeHandler, collateralType, deltaWad));
         // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
         transferInternalCoins(manager, safe, address(this), toRad(deltaWad));
         // Allows adapter to access to proxy's COIN balance in the safeEngine

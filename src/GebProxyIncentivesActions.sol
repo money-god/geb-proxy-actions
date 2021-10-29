@@ -91,7 +91,6 @@ contract GebProxyIncentivesActions is BasicActions {
 
     /// @notice Opens Safe, locks Eth, generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap
     /// @param manager address
-    /// @param taxCollector address
     /// @param ethJoin address
     /// @param coinJoin address
     /// @param uniswapRouter address - Uniswap V2 Router
@@ -101,7 +100,7 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function openLockETHGenerateDebtProvideLiquidityUniswap(
         address manager,
-        address taxCollector,
+        address /* taxCollector */,
         address ethJoin,
         address coinJoin,
         address uniswapRouter,
@@ -115,7 +114,7 @@ contract GebProxyIncentivesActions is BasicActions {
 
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
 
-        _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, address(this));
+        _generateDebt(manager, coinJoin, safe, deltaWad, address(this));
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, msg.sender, minTokenAmounts);
 
@@ -126,7 +125,6 @@ contract GebProxyIncentivesActions is BasicActions {
 
     /// @notice Locks Eth, generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap
     /// @param manager address
-    /// @param taxCollector address
     /// @param ethJoin address
     /// @param coinJoin address
     /// @param uniswapRouter address - Uniswap V2 Router
@@ -136,7 +134,7 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function lockETHGenerateDebtProvideLiquidityUniswap(
         address manager,
-        address taxCollector,
+        address /* taxCollector */,
         address ethJoin,
         address coinJoin,
         address uniswapRouter,
@@ -149,7 +147,7 @@ contract GebProxyIncentivesActions is BasicActions {
 
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
 
-        _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, address(this));
+        _generateDebt(manager, coinJoin, safe, deltaWad, address(this));
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, msg.sender, minTokenAmounts);
 
@@ -160,7 +158,6 @@ contract GebProxyIncentivesActions is BasicActions {
 
     /// @notice Opens Safe, locks Eth, generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap and stakes LP tokens in Farm
     /// @param manager address
-    /// @param taxCollector address
     /// @param ethJoin address
     /// @param coinJoin address
     /// @param uniswapRouter address - Uniswap V2 Router
@@ -171,7 +168,7 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function openLockETHGenerateDebtProvideLiquidityStake(
         address manager,
-        address taxCollector,
+        address /* taxCollector */,
         address ethJoin,
         address coinJoin,
         address uniswapRouter,
@@ -186,7 +183,7 @@ contract GebProxyIncentivesActions is BasicActions {
 
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
 
-        _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, address(this));
+        _generateDebt(manager, coinJoin, safe, deltaWad, address(this));
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, address(this), minTokenAmounts);
 
@@ -199,7 +196,6 @@ contract GebProxyIncentivesActions is BasicActions {
 
     /// @notice Locks Eth, generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap and stakes LP tokens in Farm
     /// @param manager address
-    /// @param taxCollector address
     /// @param ethJoin address
     /// @param coinJoin address
     /// @param uniswapRouter address - Uniswap V2 Router
@@ -210,7 +206,7 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function lockETHGenerateDebtProvideLiquidityStake(
         address manager,
-        address taxCollector,
+        address /* taxCollector */,
         address ethJoin,
         address coinJoin,
         address uniswapRouter,
@@ -224,7 +220,7 @@ contract GebProxyIncentivesActions is BasicActions {
 
         _lockETH(manager, ethJoin, safe, subtract(msg.value, liquidityWad));
 
-        _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, address(this));
+        _generateDebt(manager, coinJoin, safe, deltaWad, address(this));
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, deltaWad, liquidityWad, address(this), minTokenAmounts);
 
@@ -275,7 +271,6 @@ contract GebProxyIncentivesActions is BasicActions {
 
     /// @notice Generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap
     /// @param manager address
-    /// @param taxCollector address
     /// @param coinJoin address
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param safe uint - Safe Id
@@ -283,7 +278,7 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function generateDebtAndProvideLiquidityUniswap(
         address manager,
-        address taxCollector,
+        address /* taxCollector */,
         address coinJoin,
         address uniswapRouter,
         uint safe,
@@ -291,7 +286,7 @@ contract GebProxyIncentivesActions is BasicActions {
         uint[2] calldata minTokenAmounts
     ) external payable {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
-        _generateDebt(manager, taxCollector, coinJoin, safe, wad, address(this));
+        _generateDebt(manager, coinJoin, safe, wad, address(this));
 
         _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, msg.sender, minTokenAmounts);
 
@@ -310,7 +305,6 @@ contract GebProxyIncentivesActions is BasicActions {
 
     /// @notice Generates debt and sends COIN amount (deltaWad) and provides it as liquidity to Uniswap and stakes LP tokens in Farm
     /// @param manager address
-    /// @param taxCollector address
     /// @param coinJoin address
     /// @param uniswapRouter address - Uniswap V2 Router
     /// @param incentives address - Liquidity mining pool
@@ -318,7 +312,7 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function generateDebtAndProvideLiquidityStake(
         address manager,
-        address taxCollector,
+        address /* taxCollector */,
         address coinJoin,
         address uniswapRouter,
         address incentives,
@@ -327,7 +321,7 @@ contract GebProxyIncentivesActions is BasicActions {
         uint[2] calldata minTokenAmounts
     ) external payable {
         DSTokenLike systemCoin = DSTokenLike(CoinJoinLike(coinJoin).systemCoin());
-        _generateDebt(manager, taxCollector, coinJoin, safe, wad, address(this));
+        _generateDebt(manager, coinJoin, safe, wad, address(this));
         _provideLiquidityUniswap(coinJoin, uniswapRouter, wad, msg.value, address(this), minTokenAmounts);
         _stakeInMine(incentives);
 
@@ -336,7 +330,7 @@ contract GebProxyIncentivesActions is BasicActions {
         systemCoin.transfer(msg.sender, systemCoin.balanceOf(address(this)));
     }
 
-    /// @notice Harvests rewards available (both instant and staked) 
+    /// @notice Harvests rewards available (both instant and staked)
     /// @param incentives address - Liquidity mining pool
     function getRewards(address incentives) public {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
