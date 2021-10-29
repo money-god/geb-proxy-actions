@@ -700,8 +700,21 @@ contract BasicActions is Common {
         uint safe,
         uint deltaWad
     ) public payable {
-        _lockETH(manager, ethJoin, safe, msg.value);
-        _generateDebt(manager, taxCollector, coinJoin, safe, deltaWad, msg.sender);
+        address safeHandler = ManagerLike(manager).safes(safe);
+        address safeEngine = ManagerLike(manager).safeEngine();
+        bytes32 collateralType = ManagerLike(manager).collateralTypes(safe);
+        // Receives ETH amount, converts it to WETH and joins it into the safeEngine
+        ethJoin_join(ethJoin, safeHandler, msg.value);
+        // Locks WETH amount into the SAFE and generates debt
+        modifySAFECollateralization(manager, safe, toInt(msg.value), _getGeneratedDeltaDebt(safeEngine, taxCollector, safeHandler, collateralType, deltaWad));
+        // Moves the COIN amount (balance in the safeEngine in rad) to proxy's address
+        transferInternalCoins(manager, safe, address(this), toRad(deltaWad));
+        // Allows adapter to access to proxy's COIN balance in the safeEngine
+        if (SAFEEngineLike(safeEngine).canModifySAFE(address(this), address(coinJoin)) == 0) {
+            SAFEEngineLike(safeEngine).approveSAFEModification(coinJoin);
+        }
+        // Exits COIN to the user's wallet as a token
+        CoinJoinLike(coinJoin).exit(msg.sender, deltaWad);
     }
 
     /// @notice Opens Safe, locks Eth, generates debt and sends COIN amount (deltaWad) to msg.sender
@@ -740,7 +753,7 @@ contract BasicActions is Common {
         _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, collateralWad, deltaWad, true);
         // Sends ETH back to the user's wallet
         msg.sender.transfer(collateralWad);
-    }    
+    }
 }
 
 contract GebProxyActions is BasicActions {
