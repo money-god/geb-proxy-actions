@@ -155,7 +155,6 @@ contract GebProxyLeverageActions is BasicActions {
     /// @param uniswapV2Pair address
     /// @param manager address
     /// @param ethJoin address
-    /// @param taxCollector address
     /// @param coinJoin address
     /// @param weth address
     /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
@@ -165,7 +164,6 @@ contract GebProxyLeverageActions is BasicActions {
         address uniswapV2Pair,
         address manager,
         address ethJoin,
-        address taxCollector,
         address coinJoin,
         address weth,
         address callbackProxy,
@@ -178,7 +176,6 @@ contract GebProxyLeverageActions is BasicActions {
             uniswapV2Pair,
             manager,
             ethJoin,
-            taxCollector,
             coinJoin,
             weth,
             callbackProxy,
@@ -192,7 +189,6 @@ contract GebProxyLeverageActions is BasicActions {
     /// @param uniswapV2Pair address
     /// @param manager address
     /// @param ethJoin address
-    /// @param taxCollector address
     /// @param coinJoin address
     /// @param weth address
     /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
@@ -203,7 +199,6 @@ contract GebProxyLeverageActions is BasicActions {
         address uniswapV2Pair,
         address manager,
         address ethJoin,
-        address taxCollector,
         address coinJoin,
         address weth,
         address callbackProxy,
@@ -216,7 +211,6 @@ contract GebProxyLeverageActions is BasicActions {
             uniswapV2Pair,
             manager,
             ethJoin,
-            taxCollector,
             coinJoin,
             weth,
             callbackProxy,
@@ -230,7 +224,6 @@ contract GebProxyLeverageActions is BasicActions {
     /// @param uniswapV2Pair address
     /// @param manager address
     /// @param ethJoin address
-    /// @param taxCollector address
     /// @param coinJoin address
     /// @param weth address
     /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
@@ -241,7 +234,6 @@ contract GebProxyLeverageActions is BasicActions {
         address uniswapV2Pair,
         address manager,
         address ethJoin,
-        address taxCollector,
         address coinJoin,
         address weth,
         address callbackProxy,
@@ -260,7 +252,6 @@ contract GebProxyLeverageActions is BasicActions {
               manager,
               ethJoin,
               safe,
-              taxCollector,
               coinJoin
           ),
           uniswapV2Pair,
@@ -281,9 +272,8 @@ contract GebProxyLeverageActions is BasicActions {
             address manager,
             address ethJoin,
             uint safe,
-            address taxCollector,
             address coinJoin
-        ) = abi.decode(data, (address, address, uint, address, address));
+        ) = abi.decode(data, (address, address, uint, address));
         _lockETH(manager, ethJoin, safe, collateralAmount);
         _generateDebt(manager, coinJoin, safe, amountToRepay, address(this));
     }
@@ -292,7 +282,6 @@ contract GebProxyLeverageActions is BasicActions {
     /// @param uniswapV2Pair address
     /// @param manager address
     /// @param ethJoin address
-    /// @param taxCollector address
     /// @param coinJoin address
     /// @param weth address
     /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
@@ -303,7 +292,6 @@ contract GebProxyLeverageActions is BasicActions {
         address uniswapV2Pair,
         address manager,
         address ethJoin,
-        address taxCollector,
         address coinJoin,
         address weth,
         address callbackProxy,
@@ -315,7 +303,6 @@ contract GebProxyLeverageActions is BasicActions {
             uniswapV2Pair,
             manager,
             ethJoin,
-            taxCollector,
             coinJoin,
             weth,
             callbackProxy,
@@ -329,7 +316,6 @@ contract GebProxyLeverageActions is BasicActions {
     /// @param uniswapV2Pair address
     /// @param manager address
     /// @param ethJoin address
-    /// @param taxCollector address
     /// @param coinJoin address
     /// @param weth address
     /// @param callbackProxy Proxy contract that contains logic for receiving the Uniswap callback
@@ -339,7 +325,6 @@ contract GebProxyLeverageActions is BasicActions {
         address uniswapV2Pair,
         address manager,
         address ethJoin,
-        address taxCollector,
         address coinJoin,
         address weth,
         address callbackProxy,
@@ -353,7 +338,6 @@ contract GebProxyLeverageActions is BasicActions {
             manager,
             ethJoin,
             safe,
-            taxCollector,
             coinJoin
         );
         // flashswap
@@ -370,9 +354,8 @@ contract GebProxyLeverageActions is BasicActions {
             address manager,
             address ethJoin,
             uint safe,
-            , // taxCollector
             address coinJoin
-        ) = abi.decode(data, (address, address, uint, address, address));
+        ) = abi.decode(data, (address, address, uint, address));
         require(coinAmount == CoinJoinLike(coinJoin).systemCoin().balanceOf(address(this)), "funds not here");
 
         _repayDebtAndFreeETH(manager, ethJoin, coinJoin, safe, amountToRepay, coinAmount, false);

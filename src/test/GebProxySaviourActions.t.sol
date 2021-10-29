@@ -120,7 +120,7 @@ contract ProxyCalls {
         }
     }
 
-    function openLockETHAndGenerateDebt(address, address, address, address, bytes32, uint) public payable returns (uint safe) {
+    function openLockETHAndGenerateDebt(address, address, address, bytes32, uint) public payable returns (uint safe) {
         address payable target = address(proxy);
         bytes memory data = abi.encodeWithSignature("execute(address,bytes)", gebProxyActions, msg.data);
         assembly {
@@ -612,7 +612,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_protect_safe() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         this.protectSAFE(address(compoundSaviour), address(safeManager), safe, address(liquidationEngine));
         assertEq(liquidationEngine.chosenSAFESaviour("eth", safeManager.safes(safe)), address(compoundSaviour));
@@ -623,7 +623,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_set_desired_cratio() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         this.setDesiredCollateralizationRatio(address(cRatioSetter), "eth", safe, 999);
         assertEq(cRatioSetter.desiredCollateralizationRatios("eth", safeManager.safes(safe)), 999);
@@ -634,7 +634,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_deposit_in_compound_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         systemCoin.approve(address(proxy), uint(-1));
         uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
@@ -651,7 +651,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_deposit_in_uniswap_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(
@@ -672,7 +672,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function testFail_deposit_in_uniswap_saviour_collateral_specific() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(
@@ -688,7 +688,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_set_desired_cratio_deposit_in_compound_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         systemCoin.approve(address(proxy), uint(-1));
         uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
@@ -709,7 +709,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_set_desired_cratio_deposit_in_uniswap_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(
@@ -733,7 +733,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_withdraw_self_from_compound_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         systemCoin.approve(address(proxy), uint(-1));
         uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
@@ -754,7 +754,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_withdraw_other_from_compound_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         systemCoin.approve(address(proxy), uint(-1));
 
@@ -774,7 +774,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_withdraw_self_from_uniswap_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(
@@ -797,7 +797,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_withdraw_other_from_uniswap_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(
@@ -821,7 +821,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_set_desired_cratio_withdraw_from_compound_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         systemCoin.approve(address(proxy), uint(-1));
         uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
@@ -845,7 +845,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_set_desired_cratio_withdraw_from_uniswap_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(
@@ -871,7 +871,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_protect_safe_deposit_compound_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         systemCoin.approve(address(proxy), uint(-1));
         uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
@@ -892,7 +892,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_protect_safe_deposit_uniswap_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(
@@ -916,7 +916,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_protect_safe_set_desired_cratio_deposit_compound_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         systemCoin.approve(address(proxy), uint(-1));
         uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
@@ -939,7 +939,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_protect_safe_set_desired_cratio_deposit_uniswap_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(
@@ -965,7 +965,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_withdraw_uncover_compound_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         systemCoin.approve(address(proxy), uint(-1));
         uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
@@ -992,7 +992,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_withdraw_uncover_uniswap_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(
@@ -1022,7 +1022,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_withdraw_from_compound_saviour_protect_deposit_in_uniswap_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         systemCoin.approve(address(proxy), uint(-1));
         uint256 systemCoinBalanceSelf = systemCoin.balanceOf(address(this));
@@ -1067,7 +1067,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
 
     function test_withdraw_from_uniswap_saviour_protect_deposit_in_compound_saviour() public {
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         systemCoin.approve(address(proxy), uint(-1));
 
@@ -1114,7 +1114,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
         uniswapSaviour.modifyParameters("minKeeperPayoutValue", 1 ether);
 
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(
@@ -1169,7 +1169,7 @@ contract GebProxySaviourActionsTest is DSTest, ProxyCalls {
         uniswapSaviour.modifyParameters("minKeeperPayoutValue", 1 ether);
 
         uint safe = this.openLockETHAndGenerateDebt{value: 2 ether}
-          (address(safeManager), address(taxCollector), address(collateralJoin), address(coinJoin), "eth", 300 ether);
+          (address(safeManager), address(collateralJoin), address(coinJoin), "eth", 300 ether);
 
         // Add liquidity to Uniswap
         addPairLiquidityRouter(

@@ -104,10 +104,6 @@ abstract contract GlobalSettlementLike {
     function processSAFE(bytes32, address) virtual public;
 }
 
-abstract contract TaxCollectorLike {
-    function taxSingle(bytes32) virtual public returns (uint);
-}
-
 abstract contract CoinSavingsAccountLike {
     function savings(address) virtual public view returns (uint);
     function updateAccumulatedRate() virtual public returns (uint);
@@ -200,7 +196,6 @@ contract BasicActions is Common {
         uint wad
     ) internal returns (int deltaDebt) {
         // Updates stability fee rate
-        // uint rate = TaxCollectorLike(taxCollector).taxSingle(collateralType);
         (, uint rate,,,) = SAFEEngineLike(safeEngine).collateralTypes(collateralType);
         require(rate > 0, "invalid-collateral-type");
 
@@ -660,7 +655,6 @@ contract BasicActions is Common {
     /// @param wad uint - Amount
     function generateDebt(
         address manager,
-        address /* taxCollector */,
         address coinJoin,
         uint safe,
         uint wad
@@ -690,7 +684,6 @@ contract BasicActions is Common {
     /// @param deltaWad uint - Amount
     function lockETHAndGenerateDebt(
         address manager,
-        address /* taxCollector */,
         address ethJoin,
         address coinJoin,
         uint safe,
@@ -715,20 +708,18 @@ contract BasicActions is Common {
 
     /// @notice Opens Safe, locks Eth, generates debt and sends COIN amount (deltaWad) to msg.sender
     /// @param manager address
-    /// @param taxCollector address
     /// @param ethJoin address
     /// @param coinJoin address
     /// @param deltaWad uint - Amount
     function openLockETHAndGenerateDebt(
         address manager,
-        address taxCollector,
         address ethJoin,
         address coinJoin,
         bytes32 collateralType,
         uint deltaWad
     ) external payable returns (uint safe) {
         safe = openSAFE(manager, collateralType, address(this));
-        lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, safe, deltaWad);
+        lockETHAndGenerateDebt(manager, ethJoin, coinJoin, safe, deltaWad);
     }
 
     /// @notice Repays debt and frees ETH (sends it to msg.sender)
@@ -853,14 +844,13 @@ contract GebProxyActions is BasicActions {
 
     function generateDebtAndProtectSAFE(
         address manager,
-        address taxCollector,
         address coinJoin,
         uint safe,
         uint wad,
         address liquidationEngine,
         address saviour
     ) external {
-        generateDebt(manager, taxCollector, coinJoin, safe, wad);
+        generateDebt(manager, coinJoin, safe, wad);
         protectSAFE(manager, safe, liquidationEngine, saviour);
     }
 
@@ -918,7 +908,6 @@ contract GebProxyActions is BasicActions {
 
     function openLockETHGenerateDebtAndProtectSAFE(
         address manager,
-        address taxCollector,
         address ethJoin,
         address coinJoin,
         bytes32 collateralType,
@@ -927,13 +916,12 @@ contract GebProxyActions is BasicActions {
         address saviour
     ) public payable returns (uint safe) {
         safe = openSAFE(manager, collateralType, address(this));
-        lockETHAndGenerateDebt(manager, taxCollector, ethJoin, coinJoin, safe, deltaWad);
+        lockETHAndGenerateDebt(manager, ethJoin, coinJoin, safe, deltaWad);
         protectSAFE(manager, safe, liquidationEngine, saviour);
     }
 
     function lockTokenCollateralAndGenerateDebt(
         address manager,
-        address /* taxCollector */,
         address collateralJoin,
         address coinJoin,
         uint safe,
@@ -960,7 +948,6 @@ contract GebProxyActions is BasicActions {
 
     function lockTokenCollateralGenerateDebtAndProtectSAFE(
         address manager,
-        address taxCollector,
         address collateralJoin,
         address coinJoin,
         uint safe,
@@ -972,7 +959,6 @@ contract GebProxyActions is BasicActions {
     ) public {
         lockTokenCollateralAndGenerateDebt(
           manager,
-          taxCollector,
           collateralJoin,
           coinJoin,
           safe,
@@ -985,7 +971,6 @@ contract GebProxyActions is BasicActions {
 
     function openLockTokenCollateralAndGenerateDebt(
         address manager,
-        address taxCollector,
         address collateralJoin,
         address coinJoin,
         bytes32 collateralType,
@@ -994,12 +979,11 @@ contract GebProxyActions is BasicActions {
         bool transferFrom
     ) public returns (uint safe) {
         safe = openSAFE(manager, collateralType, address(this));
-        lockTokenCollateralAndGenerateDebt(manager, taxCollector, collateralJoin, coinJoin, safe, collateralAmount, deltaWad, transferFrom);
+        lockTokenCollateralAndGenerateDebt(manager, collateralJoin, coinJoin, safe, collateralAmount, deltaWad, transferFrom);
     }
 
     function openLockTokenCollateralGenerateDebtAndProtectSAFE(
         address manager,
-        address taxCollector,
         address collateralJoin,
         address coinJoin,
         bytes32 collateralType,
@@ -1010,13 +994,12 @@ contract GebProxyActions is BasicActions {
         address saviour
     ) public returns (uint safe) {
         safe = openSAFE(manager, collateralType, address(this));
-        lockTokenCollateralAndGenerateDebt(manager, taxCollector, collateralJoin, coinJoin, safe, collateralAmount, deltaWad, transferFrom);
+        lockTokenCollateralAndGenerateDebt(manager, collateralJoin, coinJoin, safe, collateralAmount, deltaWad, transferFrom);
         protectSAFE(manager, safe, liquidationEngine, saviour);
     }
 
     function openLockGNTAndGenerateDebt(
         address manager,
-        address taxCollector,
         address gntJoin,
         address coinJoin,
         bytes32 collateralType,
@@ -1030,12 +1013,11 @@ contract GebProxyActions is BasicActions {
         }
         // Transfer funds to the funds which previously were sent to the proxy
         CollateralLike(CollateralJoinLike(gntJoin).collateral()).transfer(bag, collateralAmount);
-        safe = openLockTokenCollateralAndGenerateDebt(manager, taxCollector, gntJoin, coinJoin, collateralType, collateralAmount, deltaWad, false);
+        safe = openLockTokenCollateralAndGenerateDebt(manager, gntJoin, coinJoin, collateralType, collateralAmount, deltaWad, false);
     }
 
     function openLockGNTGenerateDebtAndProtectSAFE(
         address manager,
-        address taxCollector,
         address gntJoin,
         address coinJoin,
         bytes32 collateralType,
@@ -1046,7 +1028,6 @@ contract GebProxyActions is BasicActions {
     ) public returns (address bag, uint safe) {
         (bag, safe) = openLockGNTAndGenerateDebt(
           manager,
-          taxCollector,
           gntJoin,
           coinJoin,
           collateralType,

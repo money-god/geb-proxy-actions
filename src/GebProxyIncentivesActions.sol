@@ -100,7 +100,6 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function openLockETHGenerateDebtProvideLiquidityUniswap(
         address manager,
-        address /* taxCollector */,
         address ethJoin,
         address coinJoin,
         address uniswapRouter,
@@ -134,7 +133,6 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function lockETHGenerateDebtProvideLiquidityUniswap(
         address manager,
-        address /* taxCollector */,
         address ethJoin,
         address coinJoin,
         address uniswapRouter,
@@ -168,7 +166,6 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function openLockETHGenerateDebtProvideLiquidityStake(
         address manager,
-        address /* taxCollector */,
         address ethJoin,
         address coinJoin,
         address uniswapRouter,
@@ -206,7 +203,6 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function lockETHGenerateDebtProvideLiquidityStake(
         address manager,
-        address /* taxCollector */,
         address ethJoin,
         address coinJoin,
         address uniswapRouter,
@@ -278,7 +274,6 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function generateDebtAndProvideLiquidityUniswap(
         address manager,
-        address /* taxCollector */,
         address coinJoin,
         address uniswapRouter,
         uint safe,
@@ -312,7 +307,6 @@ contract GebProxyIncentivesActions is BasicActions {
     /// @param minTokenAmounts uint[2] - minimum ETH/Token amounts when providing liquidity to Uniswap (user set acceptable slippage)
     function generateDebtAndProvideLiquidityStake(
         address manager,
-        address /* taxCollector */,
         address coinJoin,
         address uniswapRouter,
         address incentives,
