@@ -2,7 +2,7 @@
 pragma solidity 0.6.7;
 
 import "ds-test/test.sol";
-import "ds-weth/weth9.sol";
+import "./weth9.sol";
 import "ds-token/token.sol";
 
 import {GebProxyActions, GebProxyLeverageActions} from "../GebProxyLeverageActions.sol";
@@ -15,9 +15,9 @@ import {GebSafeManager} from "geb-safe-manager/GebSafeManager.sol";
 import {GetSafes} from "geb-safe-manager/GetSafes.sol";
 import {GebProxyRegistry, DSProxyFactory, DSProxy} from "geb-proxy-registry/GebProxyRegistry.sol";
 
-import "../uni/UniswapV2Factory.sol";
-import "../uni/UniswapV2Pair.sol";
-import "../uni/UniswapV2Router02.sol";
+import "../external/uni-v2/UniswapV2Factory.sol";
+import "../external/uni-v2/UniswapV2Pair.sol";
+import "../external/uni-v2/UniswapV2Router02.sol";
 
 contract ProxyCalls {
     DSProxy proxy;

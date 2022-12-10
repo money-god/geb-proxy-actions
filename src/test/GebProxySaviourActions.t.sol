@@ -2,7 +2,7 @@ pragma solidity 0.6.7;
 
 import "ds-test/test.sol";
 import "ds-token/token.sol";
-import "ds-weth/weth9.sol";
+import "./weth9.sol";
 
 import {SAFEEngine} from 'geb/SAFEEngine.sol';
 import {Coin} from 'geb/Coin.sol';
