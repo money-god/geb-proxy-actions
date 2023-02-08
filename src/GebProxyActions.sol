@@ -44,6 +44,7 @@ abstract contract ManagerLike {
     function enterSystem(address, uint) virtual public;
     function moveSAFE(uint, uint) virtual public;
     function protectSAFE(uint, address, address) virtual public;
+    function collectRewards(uint, address) virtual public;
 }
 
 abstract contract SAFEEngineLike {

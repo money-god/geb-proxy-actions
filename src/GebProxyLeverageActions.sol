@@ -18,9 +18,9 @@
 pragma solidity 0.6.7;
 
 import "./GebProxyActions.sol";
-import "./uni/interfaces/IUniswapV2Router02.sol";
-import "./uni/interfaces/IUniswapV2Pair.sol";
-import "./uni/interfaces/IUniswapV2Factory.sol";
+import "./external/uni-v2/interfaces/IUniswapV2Router02.sol";
+import "./external/uni-v2/interfaces/IUniswapV2Pair.sol";
+import "./external/uni-v2/interfaces/IUniswapV2Factory.sol";
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // WARNING: These functions meant to be used as a a library for a DSProxy. Some are unsafe if you call them directly.
