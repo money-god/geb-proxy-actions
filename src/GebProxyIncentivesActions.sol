@@ -45,6 +45,14 @@ abstract contract GebIncentivesLike {
 /// @notice This contract is supposed to be used alongside a DSProxy contract.
 /// @dev These functions are meant to be used as a a library for a DSProxy. Some are unsafe if you call them directly.
 contract GebProxyIncentivesActions {
+    WethLike public immutable weth;
+
+    constructor (address weth_) public {
+        weth = WethLike(weth_);
+    }
+
+
+
     // Internal functions
 
     /// @notice Provides liquidity on bunni.
@@ -61,8 +69,8 @@ contract GebProxyIncentivesActions {
     /// @return amount0 The amount of token0 to acheive resulting liquidity
     /// @return amount1 The amount of token1 to acheive resulting liquidity
     function _provideLiquidityBunni(address bunniHub, IBunniHub.DepositParams memory params) internal returns (uint, uint128, uint, uint) {
-        DSTokenLike(params.key.pool.token0()).approve(address(params.key.pool), params.amount0Desired);
-        DSTokenLike(IUniswapV3Pool(params.key.pool).token1()).approve(address(params.key.pool), params.amount1Desired);
+        DSTokenLike(params.key.pool.token0()).approve(bunniHub, params.amount0Desired);
+        DSTokenLike(IUniswapV3Pool(params.key.pool).token1()).approve(bunniHub, params.amount1Desired);
 
         return IBunniHub(bunniHub).deposit(params);
     }
@@ -102,12 +110,31 @@ contract GebProxyIncentivesActions {
     /// amount0Min The minimum amount of token0 to spend, which serves as a slippage check,
     /// amount1Min The minimum amount of token1 to spend, which serves as a slippage check,
     /// deadline The time by which the transaction must be included to effect the change
-    /// @return shares The new share tokens minted to the sender
-    /// @return addedLiquidity The new liquidity amount as a result of the increase
-    /// @return amount0 The amount of token0 to acheive resulting liquidity
-    /// @return amount1 The amount of token1 to acheive resulting liquidity
-    function provideLiquidityBunni(address bunniHub, IBunniHub.DepositParams calldata params) external returns (uint, uint128, uint, uint) {
-        return _provideLiquidityBunni(bunniHub, params);        
+    function provideLiquidityBunni(address bunniHub, IBunniHub.DepositParams calldata params) external payable {
+        weth.deposit{value: msg.value}();
+        DSTokenLike token0 = DSTokenLike(IUniswapV3Pool(params.key.pool).token0());
+        DSTokenLike token1 = DSTokenLike(IUniswapV3Pool(params.key.pool).token1());
+
+        if (params.amount0Desired == msg.value) 
+            token1.transferFrom(msg.sender, address(this), params.amount1Desired);
+        else if (params.amount1Desired == msg.value) 
+            token0.transferFrom(msg.sender, address(this), params.amount0Desired);
+        else revert("invalid eth value");
+
+        // return bunni tokens to user.
+        (uint shares,,,) = _provideLiquidityBunni(bunniHub, params);  
+        IBunniToken shareToken = IBunniHub(bunniHub).getBunniToken(params.key);
+        shareToken.transfer(msg.sender, shareToken.balanceOf(address(this)));
+
+        // sends tokens/eth back
+        weth.withdraw(weth.balanceOf(address(this)));
+        address(msg.sender).call{value: address(this).balance}("");
+
+        if (address(token0) == address(weth)) {
+            token1.transfer(msg.sender, token1.balanceOf(address(this)));
+        } else {
+            token0.transfer(msg.sender, token0.balanceOf(address(this)));
+        }
     }
 
     /// @notice Stakes in liquidity mining pool
@@ -119,9 +146,29 @@ contract GebProxyIncentivesActions {
         _stakeInMine(incentives);
     }
 
-    function provideLiquidityBunniAndStake(address bunniHub, IBunniHub.DepositParams calldata params, address incentives) external {
+    function provideLiquidityBunniAndStake(address bunniHub, IBunniHub.DepositParams calldata params, address incentives) external payable {
+        weth.deposit{value: msg.value}();
+        DSTokenLike token0 = DSTokenLike(IUniswapV3Pool(params.key.pool).token0());
+        DSTokenLike token1 = DSTokenLike(IUniswapV3Pool(params.key.pool).token1());
+
+        if (params.amount0Desired == msg.value) 
+            token1.transferFrom(msg.sender, address(this), params.amount1Desired);
+        else if (params.amount1Desired == msg.value) 
+            token0.transferFrom(msg.sender, address(this), params.amount0Desired);
+        else revert("invalid eth value");
+
         _provideLiquidityBunni(bunniHub, params);  
-        _stakeInMine(incentives);        
+        _stakeInMine(incentives);    
+
+        // sends tokens/eth back
+        weth.withdraw(weth.balanceOf(address(this)));
+        address(msg.sender).call{value: address(this).balance}("");
+
+        if (address(token0) == address(weth)) {
+            token1.transfer(msg.sender, token1.balanceOf(address(this)));
+        } else {
+            token0.transfer(msg.sender, token0.balanceOf(address(this)));
+        }            
     }
 
     /// @notice Harvests rewards available 
@@ -190,13 +237,23 @@ contract GebProxyIncentivesActions {
     /// amount0Min The minimum amount of token0 that should be accounted for the burned liquidity,
     /// amount1Min The minimum amount of token1 that should be accounted for the burned liquidity,
     /// deadline The time by which the transaction must be included to effect the change
-    /// @return removedLiquidity The amount of liquidity decrease
-    /// @return amount0 The amount of token0 withdrawn to the recipient
-    /// @return amount1 The amount of token1 withdrawn to the recipient
-    function removeLiquidityBunni(address bunniHub, IBunniHub.WithdrawParams calldata params) external returns (uint128, uint, uint) {
+    function removeLiquidityBunni(address bunniHub, IBunniHub.WithdrawParams calldata params) external {
         IBunniToken shareToken = IBunniHub(bunniHub).getBunniToken(params.key);
         shareToken.transferFrom(msg.sender, address(this), params.shares);        
-        return _removeLiquidityBunni(bunniHub, params);
+        _removeLiquidityBunni(bunniHub, params);
+
+        DSTokenLike token0 = DSTokenLike(IUniswapV3Pool(params.key.pool).token0());
+        DSTokenLike token1 = DSTokenLike(IUniswapV3Pool(params.key.pool).token1());        
+
+        // sends tokens/eth back
+        weth.withdraw(weth.balanceOf(address(this)));
+        address(msg.sender).call{value: address(this).balance}("");
+
+        if (address(token0) == address(weth)) {
+            token1.transfer(msg.sender, token1.balanceOf(address(this)));
+        } else {
+            token0.transfer(msg.sender, token0.balanceOf(address(this)));
+        }        
     }
 
     /// @notice Withdraws from liquidity mining pool and removes liquidity from Bunni
@@ -208,12 +265,22 @@ contract GebProxyIncentivesActions {
     /// amount0Min The minimum amount of token0 that should be accounted for the burned liquidity,
     /// amount1Min The minimum amount of token1 that should be accounted for the burned liquidity,
     /// deadline The time by which the transaction must be included to effect the change
-    /// @return removedLiquidity The amount of liquidity decrease
-    /// @return amount0 The amount of token0 withdrawn to the recipient
-    /// @return amount1 The amount of token1 withdrawn to the recipient
-    function withdrawAndRemoveLiquidity(address incentives, uint value, address bunniHub, IBunniHub.WithdrawParams calldata params) external returns (uint128, uint, uint) {
+    function withdrawAndRemoveLiquidity(address incentives, uint value, address bunniHub, IBunniHub.WithdrawParams calldata params) external {
         GebIncentivesLike incentivesContract = GebIncentivesLike(incentives);
         incentivesContract.exit(value);
-        return _removeLiquidityBunni(bunniHub, params);
+        _removeLiquidityBunni(bunniHub, params);
+
+        DSTokenLike token0 = DSTokenLike(IUniswapV3Pool(params.key.pool).token0());
+        DSTokenLike token1 = DSTokenLike(IUniswapV3Pool(params.key.pool).token1());        
+
+        // sends tokens/eth back
+        weth.withdraw(weth.balanceOf(address(this)));
+        address(msg.sender).call{value: address(this).balance}("");
+
+        if (address(token0) == address(weth)) {
+            token1.transfer(msg.sender, token1.balanceOf(address(this)));
+        } else {
+            token0.transfer(msg.sender, token0.balanceOf(address(this)));
+        }        
     }
 }
