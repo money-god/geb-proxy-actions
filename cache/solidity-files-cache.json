@@ -702,7 +702,7 @@
         }
       },
       "imports": [
-        "lib/ds-weth/lib/erc20/src/erc20.sol",
+        "lib/ds-weth/lib/erc20/src/erc20.sol"
         "lib/geb-proxy-registry/lib/ds-proxy/lib/ds-auth/src/auth.sol",
         "lib/geb-proxy-registry/lib/ds-proxy/lib/ds-note/src/note.sol",
         "lib/geb-safe-saviours/lib/geb-safe-manager/lib/geb-deploy/lib/esm/lib/ds-token/lib/ds-math/src/math.sol",

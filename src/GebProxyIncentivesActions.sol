@@ -45,6 +45,7 @@ abstract contract GebIncentivesLike {
 /// @notice This contract is supposed to be used alongside a DSProxy contract.
 /// @dev These functions are meant to be used as a a library for a DSProxy. Some are unsafe if you call them directly.
 contract GebProxyIncentivesActions {
+
     WethLike public immutable weth;
 
     constructor (address weth_) public {
